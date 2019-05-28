@@ -1,10 +1,13 @@
 # Source
+ - beautify Console logs (see tawk & ga)
  - change: make toogle class default behaviour: https://github.com/janpaepke/ScrollMagic/pull/421
   - update Reveal on Scroll example to work with above bevhaviour (maybe remove a class instead of adding)
  - update: update velocity - best wait for v2 release. https://github.com/julianshapiro/velocity/releases
  - bug: find better solution for chrome parallax workaround (dev/src/ScrollMagic.js:28)
  - feature: allow duration to be something like "100% + 20" to have a fixed value added to a relative one. 
+ - feature: allow the bottom trigger to be different (i.e. when using trigger Elements with height.)
  - feature: new plugin: mobile scrolling
+ - Bug?: ScollMagic Main file check if window object exists? (search "jitter bug")
 
 # Build
  - fix docs template for anchor links

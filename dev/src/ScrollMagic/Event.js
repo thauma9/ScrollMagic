@@ -4,7 +4,7 @@
  * @private
  */
  
-ScrollMagic.Event = function (type, namespace, target, vars) {
+export default function Event (type, namespace, target, vars) {
 	vars = vars || {};
 	for (var key in vars) {
 		this[key] = vars[key];

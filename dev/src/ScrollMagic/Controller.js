@@ -1,3 +1,4 @@
+import * as _util from './_util';
 /**
  * The main class that is needed once per scroll container.
  *
@@ -24,7 +25,8 @@
  																										 If you don't use custom containers, trigger elements or have static layouts, where the positions of the trigger elements don't change, you can set this to 0 disable interval checking and improve performance.
  *
  */
-ScrollMagic.Controller = function(options) {
+ 
+export default function Controller (options) {
 	/*
 	 * ----------------------------------------------------------------
 	 * settings
@@ -673,4 +675,33 @@ ScrollMagic.Controller = function(options) {
 	return Controller;
 };
 
-// @include('Controller/_static.js')
+// STATIC METHODS
+
+// store pagewide controller options
+var CONTROLLER_OPTIONS = {
+	defaults: {
+		container: window,
+		vertical: true,
+		globalSceneOptions: {},
+		loglevel: 2,
+		refreshInterval: 100
+	}
+};
+/*
+ * method used to add an option to ScrollMagic Scenes.
+ */
+Controller.addOption = function (name, defaultValue) {
+	CONTROLLER_OPTIONS.defaults[name] = defaultValue;
+};
+// instance extension function for plugins
+Controller.extend = function (extension) {
+	var oldClass = this;
+	Controller = function () {
+		oldClass.apply(this, arguments);
+		this.$super = _util.extend({}, this); // copy parent state
+		return extension.apply(this, arguments) || this;
+	};
+	_util.extend(Controller, oldClass); // copy properties
+	Controller.prototype = oldClass.prototype; // copy prototype
+	Controller.prototype.constructor = Controller; // restore constructor
+};

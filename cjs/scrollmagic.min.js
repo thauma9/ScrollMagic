@@ -1,5 +1,1003 @@
-import * as _util from './_util';
-import Event from './Event';
+'use strict';
+
+Object.defineProperty(exports, '__esModule', { value: true });
+
+/*
+ * TODO: DOCS (private for dev)
+ */
+
+	var i;
+	
+	/**
+	 * ------------------------------
+	 * internal helpers
+	 * ------------------------------
+	 */
+
+	 // parse float and fall back to 0.
+	var floatval = function (number) {
+	 	return parseFloat(number) || 0;
+	};
+	 // get current style IE safe (otherwise IE would return calculated values for 'auto')
+	var _getComputedStyle = function (elem) {
+		return elem.currentStyle ? elem.currentStyle : window.getComputedStyle(elem);
+	};
+
+	// get element dimension (width or height)
+	var _dimension = function (which, elem, outer, includeMargin) {
+		elem = (elem === document) ? window : elem;
+		if (elem === window) {
+			includeMargin = false;
+		} else if (!type.DomElement(elem)) {
+			return 0;
+		}
+		which = which.charAt(0).toUpperCase() + which.substr(1).toLowerCase();
+		var dimension = (outer ? elem['offset' + which] || elem['outer' + which] : elem['client' + which] || elem['inner' + which]) || 0;
+		if (outer && includeMargin) {
+			var style = _getComputedStyle(elem);
+			dimension += which === 'Height' ?  floatval(style.marginTop) + floatval(style.marginBottom) : floatval(style.marginLeft) + floatval(style.marginRight);
+		}
+		return dimension;
+	};
+	// converts 'margin-top' into 'marginTop'
+	var _camelCase = function (str) {
+		return str.replace(/^[^a-z]+([a-z])/g, '$1').replace(/-([a-z])/g, function (g) { return g[1].toUpperCase(); });
+	};
+
+	/**
+	 * ------------------------------
+	 * external helpers
+	 * ------------------------------
+	 */
+
+	// extend obj – same as jQuery.extend({}, objA, objB)
+	function extend (obj) {
+		obj = obj || {};
+		for (i = 1; i < arguments.length; i++) {
+			if (!arguments[i]) {
+				continue;
+			}
+			for (var key in arguments[i]) {
+				if (arguments[i].hasOwnProperty(key)) {
+					obj[key] = arguments[i][key];
+				}
+			}
+		}
+		return obj;
+	}
+
+	// check if a css display type results in margin-collapse or not
+	function isMarginCollapseType (str) {
+		return ["block", "flex", "list-item", "table", "-webkit-box"].indexOf(str) > -1;
+	}
+
+	// implementation of requestAnimationFrame
+	// based on https://gist.github.com/paulirish/1579671
+	var
+		lastTime = 0,
+		vendors = ['ms', 'moz', 'webkit', 'o'];
+	var _requestAnimationFrame = window.requestAnimationFrame;
+	var _cancelAnimationFrame = window.cancelAnimationFrame;
+	// try vendor prefixes if the above doesn't work
+	for (i = 0; !_requestAnimationFrame && i < vendors.length; ++i) {
+		_requestAnimationFrame = window[vendors[i] + 'RequestAnimationFrame'];
+		_cancelAnimationFrame = window[vendors[i] + 'CancelAnimationFrame'] || window[vendors[i] + 'CancelRequestAnimationFrame'];
+	}
+
+	// fallbacks
+	if (!_requestAnimationFrame) {
+		_requestAnimationFrame = function (callback) {
+			var
+				currTime = new Date().getTime(),
+				timeToCall = Math.max(0, 16 - (currTime - lastTime)),
+				id = window.setTimeout(function () { callback(currTime + timeToCall); }, timeToCall);
+			lastTime = currTime + timeToCall;
+			return id;
+		};
+	}
+	if (!_cancelAnimationFrame) {
+		_cancelAnimationFrame = function (id) {
+			window.clearTimeout(id);
+		};
+	}
+	const rAF = _requestAnimationFrame.bind(window);
+	const cAF = _cancelAnimationFrame.bind(window);
+
+	// (BUILD) - REMOVE IN MINIFY - START
+	var
+		loglevels = ["error", "warn", "log"],
+		console = window.console || {};
+
+	console.log = console.log || function(){}; // no console log, well - do nothing then...
+	// make sure methods for all levels exist.
+	for(i = 0; i<loglevels.length; i++) {
+		var method = loglevels[i];
+		if (!console[method]) {
+			console[method] = console.log; // prefer .log over nothing
+		}
+	}
+	function log (loglevel) {
+		if (loglevel > loglevels.length || loglevel <= 0) loglevel = loglevels.length;
+		var now = new Date(),
+			time = ("0"+now.getHours()).slice(-2) + ":" + ("0"+now.getMinutes()).slice(-2) + ":" + ("0"+now.getSeconds()).slice(-2) + ":" + ("00"+now.getMilliseconds()).slice(-3),
+			method = loglevels[loglevel-1],
+			args = Array.prototype.splice.call(arguments, 1),
+			func = Function.prototype.bind.call(console[method], console);
+		args.unshift(time);
+		func.apply(console, args);
+	}
+	// (BUILD) - REMOVE IN MINIFY - END
+
+	/**
+	 * ------------------------------
+	 * type testing
+	 * ------------------------------
+	 */
+
+	function type (v) {
+		return Object.prototype.toString.call(v).replace(/^\[object (.+)\]$/, "$1").toLowerCase();
+	}
+	type.String = function (v) {
+		return type(v) === 'string';
+	};
+	type.Function = function (v) {
+		return type(v) === 'function';
+	};
+	type.Array = function (v) {
+		return Array.isArray(v);
+	};
+	type.Number = function (v) {
+		return !type.Array(v) && (v - parseFloat(v) + 1) >= 0;
+	};
+	type.DomElement = function (o){
+		return (
+			typeof HTMLElement === "object" || typeof HTMLElement === "function"? o instanceof HTMLElement || o instanceof SVGElement : //DOM2
+			o && typeof o === "object" && o !== null && o.nodeType === 1 && typeof o.nodeName==="string"
+		);
+	};
+
+	/**
+	 * ------------------------------
+	 * DOM Element info
+	 * ------------------------------
+	 */
+	// always returns a list of matching DOM elements, from a selector, a DOM element or an list of elements or even an array of selectors
+	const get = {};
+	get.elements = function (selector) {
+		var arr = [];
+		if (type.String(selector)) {
+			try {
+				selector = document.querySelectorAll(selector);
+			} catch (e) { // invalid selector
+				return arr;
+			}
+		}
+		if (type(selector) === 'nodelist' || type.Array(selector) || selector instanceof NodeList) {
+			for (var i = 0, ref = arr.length = selector.length; i < ref; i++) { // list of elements
+				var elem = selector[i];
+				arr[i] = type.DomElement(elem) ? elem : get.elements(elem); // if not an element, try to resolve recursively
+			}
+		} else if (type.DomElement(selector) || selector === document || selector === window){
+			arr = [selector]; // only the element
+		}
+		return arr;
+	};
+	// get scroll top value
+	get.scrollTop = function (elem) {
+		return (elem && typeof elem.scrollTop === 'number') ? elem.scrollTop : window.pageYOffset || 0;
+	};
+	// get scroll left value
+	get.scrollLeft = function (elem) {
+		return (elem && typeof elem.scrollLeft === 'number') ? elem.scrollLeft : window.pageXOffset || 0;
+	};
+	// get element height
+	get.width = function (elem, outer, includeMargin) {
+		return _dimension('width', elem, outer, includeMargin);
+	};
+	// get element width
+	get.height = function (elem, outer, includeMargin) {
+		return _dimension('height', elem, outer, includeMargin);
+	};
+
+	// get element position (optionally relative to viewport)
+	get.offset = function (elem, relativeToViewport) {
+		var offset = {top: 0, left: 0};
+		if (elem && elem.getBoundingClientRect) { // check if available
+			var rect = elem.getBoundingClientRect();
+			offset.top = rect.top;
+			offset.left = rect.left;
+			if (!relativeToViewport) { // clientRect is by default relative to viewport...
+				offset.top += get.scrollTop();
+				offset.left += get.scrollLeft();
+			}
+		}
+		return offset;
+	};
+
+	/**
+	 * ------------------------------
+	 * DOM Element manipulation
+	 * ------------------------------
+	 */
+
+	function addClass (elem, classname) {
+		if (classname) {
+			if (elem.classList)
+				elem.classList.add(classname);
+			else
+				elem.className += ' ' + classname;
+		}
+	}
+	function removeClass (elem, classname) {
+		if (classname) {
+			if (elem.classList)
+				elem.classList.remove(classname);
+			else
+				elem.className = elem.className.replace(new RegExp('(^|\\b)' + classname.split(' ').join('|') + '(\\b|$)', 'gi'), ' ');
+		}
+	}
+	// if options is string -> returns css value
+	// if options is array -> returns object with css value pairs
+	// if options is object -> set new css values
+	function css (elem, options) {
+		if (type.String(options)) {
+			return _getComputedStyle(elem)[_camelCase(options)];
+		} else if (type.Array(options)) {
+			var
+				obj = {},
+				style = _getComputedStyle(elem);
+			options.forEach(function(option, key) {
+				obj[option] = style[_camelCase(option)];
+			});
+			return obj;
+		} else {
+			for (var option in options) {
+				var val = options[option];
+				if (val == parseFloat(val)) { // assume pixel for seemingly numerical values
+					val += 'px';
+				}
+				elem.style[_camelCase(option)] = val;
+			}
+		}
+	}
+
+var _util = /*#__PURE__*/Object.freeze({
+	extend: extend,
+	isMarginCollapseType: isMarginCollapseType,
+	rAF: rAF,
+	cAF: cAF,
+	log: log,
+	type: type,
+	get: get,
+	addClass: addClass,
+	removeClass: removeClass,
+	css: css
+});
+
+/**
+ * The main class that is needed once per scroll container.
+ *
+ * @class
+ *
+ * @example
+ * // basic initialization
+ * var controller = new ScrollMagic.Controller();
+ *
+ * // passing options
+ * var controller = new ScrollMagic.Controller({container: "#myContainer", loglevel: 3});
+ *
+ * @param {object} [options] - An object containing one or more options for the controller.
+ * @param {(string|object)} [options.container=window] - A selector, DOM object that references the main container for scrolling.
+ * @param {boolean} [options.vertical=true] - Sets the scroll mode to vertical (`true`) or horizontal (`false`) scrolling.
+ * @param {object} [options.globalSceneOptions={}] - These options will be passed to every Scene that is added to the controller using the addScene method. For more information on Scene options see {@link ScrollMagic.Scene}.
+ * @param {number} [options.loglevel=2] Loglevel for debugging. Note that logging is disabled in the minified version of ScrollMagic.
+										 ** `0` => silent
+										 ** `1` => errors
+										 ** `2` => errors, warnings
+										 ** `3` => errors, warnings, debuginfo
+ * @param {boolean} [options.refreshInterval=100] - Some changes don't call events by default, like changing the container size or moving a scene trigger element.  
+ 																										 This interval polls these parameters to fire the necessary events.  
+ 																										 If you don't use custom containers, trigger elements or have static layouts, where the positions of the trigger elements don't change, you can set this to 0 disable interval checking and improve performance.
+ *
+ */
+ 
+function Controller (options) {
+	/*
+	 * ----------------------------------------------------------------
+	 * settings
+	 * ----------------------------------------------------------------
+	 */
+	var
+		NAMESPACE = 'ScrollMagic.Controller',
+		SCROLL_DIRECTION_FORWARD = 'FORWARD',
+		SCROLL_DIRECTION_REVERSE = 'REVERSE',
+		SCROLL_DIRECTION_PAUSED = 'PAUSED',
+		DEFAULT_OPTIONS = CONTROLLER_OPTIONS.defaults;
+
+	/*
+	 * ----------------------------------------------------------------
+	 * private vars
+	 * ----------------------------------------------------------------
+	 */
+	var
+		Controller = this,
+		_options = extend({}, DEFAULT_OPTIONS, options),
+		_sceneObjects = [],
+		_updateScenesOnNextCycle = false,		// can be boolean (true => all scenes) or an array of scenes to be updated
+		_scrollPos = 0,
+		_scrollDirection = SCROLL_DIRECTION_PAUSED,
+		_isDocument = true,
+		_viewPortSize = 0,
+		_enabled = true,
+		_updateTimeout,
+		_refreshTimeout;
+
+	/*
+	 * ----------------------------------------------------------------
+	 * private functions
+	 * ----------------------------------------------------------------
+	 */
+
+	/**
+	 * Internal constructor function of the ScrollMagic Controller
+	 * @private
+	 */
+	var construct = function () {
+		for (var key in _options) {
+			if (!DEFAULT_OPTIONS.hasOwnProperty(key)) {
+				log$1(2, "WARNING: Unknown option \"" + key + "\"");
+				delete _options[key];
+			}
+		}
+		_options.container = get.elements(_options.container)[0];
+		// check ScrollContainer
+		if (!_options.container) {
+			log$1(1, "ERROR creating object " + NAMESPACE + ": No valid scroll container supplied");
+			throw NAMESPACE + " init failed."; // cancel
+		}
+		_isDocument = _options.container === window || _options.container === document.body || !document.body.contains(_options.container);
+		// normalize to window
+		if (_isDocument) {
+			_options.container = window;
+		}
+		// update container size immediately
+		_viewPortSize = getViewportSize();
+		// set event handlers
+		_options.container.addEventListener("resize", onChange);
+		_options.container.addEventListener("scroll", onChange);
+
+		var ri = parseInt(_options.refreshInterval, 10);
+		_options.refreshInterval = type.Number(ri) ? ri : DEFAULT_OPTIONS.refreshInterval;
+		scheduleRefresh();
+
+		// log(3, "added new " + NAMESPACE + " controller (v" + ScrollMagic.version + ")");
+	};
+
+	/**
+	* Schedule the next execution of the refresh function
+	* @private
+	*/
+	var scheduleRefresh = function () {
+		if (_options.refreshInterval > 0) {
+			_refreshTimeout = window.setTimeout(refresh, _options.refreshInterval);
+		}
+	};
+
+	/**
+	* Default function to get scroll pos - overwriteable using `Controller.scrollPos(newFunction)`
+	* @private
+	*/
+	var getScrollPos = function () {
+		return _options.vertical ? get.scrollTop(_options.container) : get.scrollLeft(_options.container);
+	};
+
+	/**
+	* Returns the current viewport Size (width vor horizontal, height for vertical)
+	* @private
+	*/
+	var getViewportSize = function () {
+		return _options.vertical ? get.height(_options.container) : get.width(_options.container);
+	};
+
+	/**
+	* Default function to set scroll pos - overwriteable using `Controller.scrollTo(newFunction)`
+	* Make available publicly for pinned mousewheel workaround.
+	* @private
+	*/
+	var setScrollPos = this._setScrollPos = function (pos) {
+		if (_options.vertical) {
+			if (_isDocument) {
+				window.scrollTo(get.scrollLeft(), pos);
+			} else {
+				_options.container.scrollTop = pos;
+			}
+		} else {
+			if (_isDocument) {
+				window.scrollTo(pos, get.scrollTop());
+			} else {
+				_options.container.scrollLeft = pos;
+			}
+		}
+	};
+
+	/**
+	* Handle updates in cycles instead of on scroll (performance)
+	* @private
+	*/
+	var updateScenes = function () {
+		if (_enabled && _updateScenesOnNextCycle) {
+			// determine scenes to update
+			var scenesToUpdate = type.Array(_updateScenesOnNextCycle) ? _updateScenesOnNextCycle : _sceneObjects.slice(0);
+			// reset scenes
+			_updateScenesOnNextCycle = false;
+			var oldScrollPos = _scrollPos;
+			// update scroll pos now instead of onChange, as it might have changed since scheduling (i.e. in-browser smooth scroll)
+			_scrollPos = Controller.scrollPos();
+			var deltaScroll = _scrollPos - oldScrollPos;
+			if (deltaScroll !== 0) { // scroll position changed?
+				_scrollDirection = (deltaScroll > 0) ? SCROLL_DIRECTION_FORWARD : SCROLL_DIRECTION_REVERSE;
+			}
+			// reverse order of scenes if scrolling reverse
+			if (_scrollDirection === SCROLL_DIRECTION_REVERSE) {
+				scenesToUpdate.reverse();
+			}
+			// update scenes
+			scenesToUpdate.forEach(function (scene, index) {
+				log$1(3, "updating Scene " + (index + 1) + "/" + scenesToUpdate.length + " (" + _sceneObjects.length + " total)");
+				scene.update(true);
+			});
+			// (BUILD) - REMOVE IN MINIFY - START
+			if (scenesToUpdate.length === 0 && _options.loglevel >= 3) {
+				log$1(3, "updating 0 Scenes (nothing added to controller)");
+			}
+			// (BUILD) - REMOVE IN MINIFY - END
+		}
+	};
+	
+	/**
+	* Initializes rAF callback
+	* @private
+	*/
+	var debounceUpdate = function () {
+		_updateTimeout = rAF(updateScenes);
+	};
+	
+	/**
+	* Handles Container changes
+	* @private
+	*/
+	var onChange = function (e) {
+		log$1(3, "event fired causing an update:", e.type);
+		if (e.type == "resize") {
+			// resize
+			_viewPortSize = getViewportSize();
+			_scrollDirection = SCROLL_DIRECTION_PAUSED;
+		}
+		// schedule update
+		if (_updateScenesOnNextCycle !== true) {
+			_updateScenesOnNextCycle = true;
+			debounceUpdate();
+		}
+	};
+
+	var refresh = function () {
+		if (!_isDocument) {
+			// simulate resize event. Only works for viewport relevant param (performance)
+			if (_viewPortSize != getViewportSize()) {
+				var resizeEvent;
+				try {
+					resizeEvent = new Event('resize', {bubbles: false, cancelable: false});
+				} catch (e) { // stupid IE
+					resizeEvent = document.createEvent("Event");
+					resizeEvent.initEvent("resize", false, false);
+				}
+				_options.container.dispatchEvent(resizeEvent);
+			}
+		}
+		_sceneObjects.forEach(function (scene, index) {// refresh all scenes
+			scene.refresh();
+		});
+		scheduleRefresh();
+	};
+
+	// (BUILD) - REMOVE IN MINIFY - START
+	/**
+	 * Send a debug message to the console.
+	 * provided publicly with _log for plugins
+	 * @private
+	 *
+	 * @param {number} loglevel - The loglevel required to initiate output for the message.
+	 * @param {...mixed} output - One or more variables that should be passed to the console.
+	 */
+	var log$1 = this._log = function (loglevel, output) {
+		if (_options.loglevel >= loglevel) {
+			Array.prototype.splice.call(arguments, 1, 0, "(" + NAMESPACE + ") ->");
+			log.apply(window, arguments);
+		}
+	};
+	// (BUILD) - REMOVE IN MINIFY - END
+	// for scenes we have getters for each option, but for the controller we don't, so we need to make it available externally for plugins
+	this._options = _options;
+
+	/**
+	 * Sort scenes in ascending order of their start offset.
+	 * @private
+	 *
+	 * @param {array} ScenesArray - an array of ScrollMagic Scenes that should be sorted
+	 * @return {array} The sorted array of Scenes.
+	 */
+	var sortScenes = function (ScenesArray) {
+		if (ScenesArray.length <= 1) {
+			return ScenesArray;
+		} else {
+			var scenes = ScenesArray.slice(0);
+			scenes.sort(function(a, b) {
+				return a.scrollOffset() > b.scrollOffset() ? 1 : -1;
+			});
+			return scenes;
+		}
+	};
+
+	/**
+	 * ----------------------------------------------------------------
+	 * public functions
+	 * ----------------------------------------------------------------
+	 */
+
+	/**
+	 * Add one ore more scene(s) to the controller.  
+	 * This is the equivalent to `Scene.addTo(controller)`.
+	 * @public
+	 * @example
+	 * // with a previously defined scene
+	 * controller.addScene(scene);
+	 *
+ 	 * // with a newly created scene.
+	 * controller.addScene(new ScrollMagic.Scene({duration : 0}));
+	 *
+ 	 * // adding multiple scenes
+	 * controller.addScene([scene, scene2, new ScrollMagic.Scene({duration : 0})]);
+	 *
+	 * @param {(ScrollMagic.Scene|array)} newScene - ScrollMagic Scene or Array of Scenes to be added to the controller.
+	 * @return {Controller} Parent object for chaining.
+	 */
+	this.addScene = function (newScene) {
+		if (type.Array(newScene)) {
+			newScene.forEach(function (scene, index) {
+				Controller.addScene(scene);
+			});
+		} else if (newScene instanceof ScrollMagic.Scene) {
+			if (newScene.controller() !== Controller) {
+				newScene.addTo(Controller);
+			} else if (_sceneObjects.indexOf(newScene) < 0){
+				// new scene
+				_sceneObjects.push(newScene); // add to array
+				_sceneObjects = sortScenes(_sceneObjects); // sort
+				newScene.on("shift.controller_sort", function() { // resort whenever scene moves
+					_sceneObjects = sortScenes(_sceneObjects);
+				});
+				// insert Global defaults.
+				for (var key in _options.globalSceneOptions) {
+					if (newScene[key]) {
+						newScene[key].call(newScene, _options.globalSceneOptions[key]);
+					}
+				}
+				log$1(3, "adding Scene (now " + _sceneObjects.length + " total)");
+			}
+		} else {
+			log$1(1, "ERROR: invalid argument supplied for '.addScene()'");
+		}
+		return Controller;
+	};
+
+	/**
+	 * Remove one ore more scene(s) from the controller.  
+	 * This is the equivalent to `Scene.remove()`.
+	 * @public
+	 * @example
+	 * // remove a scene from the controller
+	 * controller.removeScene(scene);
+	 *
+	 * // remove multiple scenes from the controller
+	 * controller.removeScene([scene, scene2, scene3]);
+	 *
+	 * @param {(ScrollMagic.Scene|array)} Scene - ScrollMagic Scene or Array of Scenes to be removed from the controller.
+	 * @returns {Controller} Parent object for chaining.
+	 */
+	this.removeScene = function (Scene) {
+		if (type.Array(Scene)) {
+			Scene.forEach(function (scene, index) {
+				Controller.removeScene(scene);
+			});
+		} else {
+			var index = _sceneObjects.indexOf(Scene);
+			if (index > -1) {
+				Scene.off("shift.controller_sort");
+				_sceneObjects.splice(index, 1);
+				log$1(3, "removing Scene (now " + _sceneObjects.length + " left)");
+				Scene.remove();
+			}
+		}
+		return Controller;
+	};
+
+	/**
+	 * Update one ore more scene(s) according to the scroll position of the container.  
+	 * This is the equivalent to `Scene.update()`.  
+	 * The update method calculates the scene's start and end position (based on the trigger element, trigger hook, duration and offset) and checks it against the current scroll position of the container.  
+	 * It then updates the current scene state accordingly (or does nothing, if the state is already correct) – Pins will be set to their correct position and tweens will be updated to their correct progress.  
+	 * _**Note:** This method gets called constantly whenever Controller detects a change. The only application for you is if you change something outside of the realm of ScrollMagic, like moving the trigger or changing tween parameters._
+	 * @public
+	 * @example
+	 * // update a specific scene on next cycle
+ 	 * controller.updateScene(scene);
+ 	 *
+	 * // update a specific scene immediately
+	 * controller.updateScene(scene, true);
+ 	 *
+	 * // update multiple scenes scene on next cycle
+	 * controller.updateScene([scene1, scene2, scene3]);
+	 *
+	 * @param {ScrollMagic.Scene} Scene - ScrollMagic Scene or Array of Scenes that is/are supposed to be updated.
+	 * @param {boolean} [immediately=false] - If `true` the update will be instant, if `false` it will wait until next update cycle.  
+	 										  This is useful when changing multiple properties of the scene - this way it will only be updated once all new properties are set (updateScenes).
+	 * @return {Controller} Parent object for chaining.
+	 */
+	this.updateScene = function (Scene, immediately) {
+		if (type.Array(Scene)) {
+			Scene.forEach(function (scene, index) {
+				Controller.updateScene(scene, immediately);
+			});
+		} else {
+			if (immediately) {
+				Scene.update(true);
+			} else if (_updateScenesOnNextCycle !== true && Scene instanceof ScrollMagic.Scene) { // if _updateScenesOnNextCycle is true, all connected scenes are already scheduled for update
+				// prep array for next update cycle
+				_updateScenesOnNextCycle = _updateScenesOnNextCycle || [];
+				if (_updateScenesOnNextCycle.indexOf(Scene) == -1) {
+					_updateScenesOnNextCycle.push(Scene);	
+				}
+				_updateScenesOnNextCycle = sortScenes(_updateScenesOnNextCycle); // sort
+				debounceUpdate();
+			}
+		}
+		return Controller;
+	};
+
+	/**
+	 * Updates the controller params and calls updateScene on every scene, that is attached to the controller.  
+	 * See `Controller.updateScene()` for more information about what this means.  
+	 * In most cases you will not need this function, as it is called constantly, whenever ScrollMagic detects a state change event, like resize or scroll.  
+	 * The only application for this method is when ScrollMagic fails to detect these events.  
+	 * One application is with some external scroll libraries (like iScroll) that move an internal container to a negative offset instead of actually scrolling. In this case the update on the controller needs to be called whenever the child container's position changes.
+	 * For this case there will also be the need to provide a custom function to calculate the correct scroll position. See `Controller.scrollPos()` for details.
+	 * @public
+	 * @example
+	 * // update the controller on next cycle (saves performance due to elimination of redundant updates)
+	 * controller.update();
+	 *
+ 	 * // update the controller immediately
+	 * controller.update(true);
+	 *
+	 * @param {boolean} [immediately=false] - If `true` the update will be instant, if `false` it will wait until next update cycle (better performance)
+	 * @return {Controller} Parent object for chaining.
+	 */
+	this.update = function (immediately) {
+		onChange({type: "resize"}); // will update size and set _updateScenesOnNextCycle to true
+		if (immediately) {
+			updateScenes();
+		}
+		return Controller;
+	};
+
+	/**
+	 * Scroll to a numeric scroll offset, a DOM element, the start of a scene or provide an alternate method for scrolling.  
+	 * For vertical controllers it will change the top scroll offset and for horizontal applications it will change the left offset.
+	 * @public
+	 *
+	 * @since 1.1.0
+	 * @example
+	 * // scroll to an offset of 100
+	 * controller.scrollTo(100);
+	 *
+	 * // scroll to a DOM element
+	 * controller.scrollTo("#anchor");
+	 *
+	 * // scroll to the beginning of a scene
+	 * var scene = new ScrollMagic.Scene({offset: 200});
+	 * controller.scrollTo(scene);
+	 *
+ 	 * // define a new scroll position modification function (jQuery animate instead of jump)
+	 * controller.scrollTo(function (newScrollPos) {
+	 *	$("html, body").animate({scrollTop: newScrollPos});
+	 * });
+	 * controller.scrollTo(100); // call as usual, but the new function will be used instead
+	 *
+ 	 * // define a new scroll function with an additional parameter
+	 * controller.scrollTo(function (newScrollPos, message) {
+	 *  console.log(message);
+	 *	$(this).animate({scrollTop: newScrollPos});
+	 * });
+	 * // call as usual, but supply an extra parameter to the defined custom function
+	 * controller.scrollTo(100, "my message");
+	 *
+ 	 * // define a new scroll function with an additional parameter containing multiple variables
+	 * controller.scrollTo(function (newScrollPos, options) {
+	 *  someGlobalVar = options.a + options.b;
+	 *	$(this).animate({scrollTop: newScrollPos});
+	 * });
+	 * // call as usual, but supply an extra parameter containing multiple options
+	 * controller.scrollTo(100, {a: 1, b: 2});
+	 *
+ 	 * // define a new scroll function with a callback supplied as an additional parameter
+	 * controller.scrollTo(function (newScrollPos, callback) {
+	 *	$(this).animate({scrollTop: newScrollPos}, 400, "swing", callback);
+	 * });
+	 * // call as usual, but supply an extra parameter, which is used as a callback in the previously defined custom scroll function
+	 * controller.scrollTo(100, function() {
+	 *	console.log("scroll has finished.");
+	 * });
+	 *
+	 * @param {mixed} scrollTarget - The supplied argument can be one of these types:
+	 * 1. `number` -> The container will scroll to this new scroll offset.
+	 * 2. `string` or `object` -> Can be a selector or a DOM object.  
+	 *  The container will scroll to the position of this element.
+	 * 3. `ScrollMagic Scene` -> The container will scroll to the start of this scene.
+	 * 4. `function` -> This function will be used for future scroll position modifications.  
+	 *  This provides a way for you to change the behaviour of scrolling and adding new behaviour like animation. The function receives the new scroll position as a parameter and a reference to the container element using `this`.  
+	 *  It may also optionally receive an optional additional parameter (see below)  
+	 *  _**NOTE:**  
+	 *  All other options will still work as expected, using the new function to scroll._
+	 * @param {mixed} [additionalParameter] - If a custom scroll function was defined (see above 4.), you may want to supply additional parameters to it, when calling it. You can do this using this parameter – see examples for details. Please note, that this parameter will have no effect, if you use the default scrolling function.
+	 * @returns {Controller} Parent object for chaining.
+	 */
+	this.scrollTo = function (scrollTarget, additionalParameter) {
+		if (type.Number(scrollTarget)) { // excecute
+			setScrollPos.call(_options.container, scrollTarget, additionalParameter);
+		} else if (scrollTarget instanceof ScrollMagic.Scene) { // scroll to scene
+			if (scrollTarget.controller() === Controller) { // check if the controller is associated with this scene
+				Controller.scrollTo(scrollTarget.scrollOffset(), additionalParameter);
+			} else {
+				log$1 (2, "scrollTo(): The supplied scene does not belong to this controller. Scroll cancelled.", scrollTarget);
+			}
+		} else if (type.Function(scrollTarget)) { // assign new scroll function
+			setScrollPos = scrollTarget;
+		} else { // scroll to element
+			var elem = get.elements(scrollTarget)[0];
+			if (elem) {
+				// if parent is pin spacer, use spacer position instead so correct start position is returned for pinned elements.
+				while (elem.parentNode.hasAttribute(PIN_SPACER_ATTRIBUTE)) {
+					elem = elem.parentNode;
+				}
+
+				var
+					param = _options.vertical ? "top" : "left", // which param is of interest ?
+					containerOffset = get.offset(_options.container), // container position is needed because element offset is returned in relation to document, not in relation to container.
+					elementOffset = get.offset(elem);
+
+				if (!_isDocument) { // container is not the document root, so substract scroll Position to get correct trigger element position relative to scrollcontent
+					containerOffset[param] -= Controller.scrollPos();
+				}
+
+				Controller.scrollTo(elementOffset[param] - containerOffset[param], additionalParameter);
+			} else {
+				log$1 (2, "scrollTo(): The supplied argument is invalid. Scroll cancelled.", scrollTarget);
+			}
+		}
+		return Controller;
+	};
+
+	/**
+	 * **Get** the current scrollPosition or **Set** a new method to calculate it.  
+	 * -> **GET**:
+	 * When used as a getter this function will return the current scroll position.  
+	 * To get a cached value use Controller.info("scrollPos"), which will be updated in the update cycle.  
+	 * For vertical controllers it will return the top scroll offset and for horizontal applications it will return the left offset.
+	 *
+	 * -> **SET**:
+	 * When used as a setter this method prodes a way to permanently overwrite the controller's scroll position calculation.  
+	 * A typical usecase is when the scroll position is not reflected by the containers scrollTop or scrollLeft values, but for example by the inner offset of a child container.  
+	 * Moving a child container inside a parent is a commonly used method for several scrolling frameworks, including iScroll.  
+	 * By providing an alternate calculation function you can make sure ScrollMagic receives the correct scroll position.  
+	 * Please also bear in mind that your function should return y values for vertical scrolls an x for horizontals.
+	 *
+	 * To change the current scroll position please use `Controller.scrollTo()`.
+	 * @public
+	 *
+	 * @example
+	 * // get the current scroll Position
+	 * var scrollPos = controller.scrollPos();
+	 *
+ 	 * // set a new scroll position calculation method
+	 * controller.scrollPos(function () {
+	 *	return this.info("vertical") ? -mychildcontainer.y : -mychildcontainer.x
+	 * });
+	 *
+	 * @param {function} [scrollPosMethod] - The function to be used for the scroll position calculation of the container.
+	 * @returns {(number|Controller)} Current scroll position or parent object for chaining.
+	 */
+	this.scrollPos = function (scrollPosMethod) {
+		if (!arguments.length) { // get
+			return getScrollPos.call(Controller);
+		} else { // set
+			if (type.Function(scrollPosMethod)) {
+				getScrollPos = scrollPosMethod;
+			} else {
+				log$1(2, "Provided value for method 'scrollPos' is not a function. To change the current scroll position use 'scrollTo()'.");
+			}
+		}
+		return Controller;
+	};
+
+	/**
+	 * **Get** all infos or one in particular about the controller.
+	 * @public
+	 * @example
+	 * // returns the current scroll position (number)
+	 * var scrollPos = controller.info("scrollPos");
+	 *
+	 * // returns all infos as an object
+	 * var infos = controller.info();
+	 *
+	 * @param {string} [about] - If passed only this info will be returned instead of an object containing all.  
+	 							 Valid options are:
+	 							 ** `"size"` => the current viewport size of the container
+	 							 ** `"vertical"` => true if vertical scrolling, otherwise false
+	 							 ** `"scrollPos"` => the current scroll position
+	 							 ** `"scrollDirection"` => the last known direction of the scroll
+	 							 ** `"container"` => the container element
+	 							 ** `"isDocument"` => true if container element is the document.
+	 * @returns {(mixed|object)} The requested info(s).
+	 */
+	this.info = function (about) {
+		var values = {
+			size: _viewPortSize, // contains height or width (in regard to orientation);
+			vertical: _options.vertical,
+			scrollPos: _scrollPos,
+			scrollDirection: _scrollDirection,
+			container: _options.container,
+			isDocument: _isDocument
+		};
+		if (!arguments.length) { // get all as an object
+			return values;
+		} else if (values[about] !== undefined) {
+			return values[about];
+		} else {
+			log$1(1, "ERROR: option \"" + about + "\" is not available");
+			return;
+		}
+	};
+
+	/**
+	 * **Get** or **Set** the current loglevel option value.
+	 * @public
+	 *
+	 * @example
+	 * // get the current value
+	 * var loglevel = controller.loglevel();
+	 *
+ 	 * // set a new value
+	 * controller.loglevel(3);
+	 *
+	 * @param {number} [newLoglevel] - The new loglevel setting of the Controller. `[0-3]`
+	 * @returns {(number|Controller)} Current loglevel or parent object for chaining.
+	 */
+	this.loglevel = function (newLoglevel) {
+		// (BUILD) - REMOVE IN MINIFY - START
+		if (!arguments.length) { // get
+			return _options.loglevel;
+		} else if (_options.loglevel != newLoglevel) { // set
+			_options.loglevel = newLoglevel;
+		}
+		// (BUILD) - REMOVE IN MINIFY - END
+		return Controller;
+	};
+
+	/**
+	 * **Get** or **Set** the current enabled state of the controller.  
+	 * This can be used to disable all Scenes connected to the controller without destroying or removing them.
+	 * @public
+	 *
+	 * @example
+	 * // get the current value
+	 * var enabled = controller.enabled();
+	 *
+ 	 * // disable the controller
+	 * controller.enabled(false);
+	 *
+	 * @param {boolean} [newState] - The new enabled state of the controller `true` or `false`.
+	 * @returns {(boolean|Controller)} Current enabled state or parent object for chaining.
+	 */
+	this.enabled = function (newState) {
+		if (!arguments.length) { // get
+			return _enabled;
+		} else if (_enabled != newState) { // set
+			_enabled = !!newState;
+			Controller.updateScene(_sceneObjects, true);
+		}
+		return Controller;
+	};
+	
+	/**
+	 * Destroy the Controller, all Scenes and everything.
+	 * @public
+	 *
+	 * @example
+	 * // without resetting the scenes
+	 * controller = controller.destroy();
+	 *
+ 	 * // with scene reset
+	 * controller = controller.destroy(true);
+	 *
+	 * @param {boolean} [resetScenes=false] - If `true` the pins and tweens (if existent) of all scenes will be reset.
+	 * @returns {null} Null to unset handler variables.
+	 */
+	this.destroy = function (resetScenes) {
+		window.clearTimeout(_refreshTimeout);
+		var i = _sceneObjects.length;
+		while (i--) {
+			_sceneObjects[i].destroy(resetScenes);
+		}
+		_options.container.removeEventListener("resize", onChange);
+		_options.container.removeEventListener("scroll", onChange);
+		cAF(_updateTimeout);
+		log$1(3, "destroyed " + NAMESPACE + " (reset: " + (resetScenes ? "true" : "false") + ")");
+		return null;
+	};
+
+	// INIT
+	construct();
+	return Controller;
+}
+// STATIC METHODS
+
+// store pagewide controller options
+var CONTROLLER_OPTIONS = {
+	defaults: {
+		container: window,
+		vertical: true,
+		globalSceneOptions: {},
+		loglevel: 2,
+		refreshInterval: 100
+	}
+};
+/*
+ * method used to add an option to ScrollMagic Scenes.
+ */
+Controller.addOption = function (name, defaultValue) {
+	CONTROLLER_OPTIONS.defaults[name] = defaultValue;
+};
+// instance extension function for plugins
+Controller.extend = function (extension) {
+	var oldClass = this;
+	Controller = function () {
+		oldClass.apply(this, arguments);
+		this.$super = extend({}, this); // copy parent state
+		return extension.apply(this, arguments) || this;
+	};
+	extend(Controller, oldClass); // copy properties
+	Controller.prototype = oldClass.prototype; // copy prototype
+	Controller.prototype.constructor = Controller; // restore constructor
+};
+
+/**
+ * TODO: DOCS (private for dev)
+ * @class
+ * @private
+ */
+ 
+function Event$1 (type, namespace, target, vars) {
+	vars = vars || {};
+	for (var key in vars) {
+		this[key] = vars[key];
+	}
+	this.type = type;
+	this.target = this.currentTarget = target;
+	this.namespace = namespace || '';
+	this.timeStamp = this.timestamp = Date.now();
+	return this;
+}
+
 /**
  * A Scene defines where the controller should react and how.
  *
@@ -38,7 +1036,7 @@ import Event from './Event';
  										  ** `3` => errors, warnings, debuginfo
  * 
  */
-export default function Scene (options) {
+function Scene (options) {
 
 	/*
 	 * ----------------------------------------------------------------
@@ -61,7 +1059,7 @@ export default function Scene (options) {
 
 	var
 		Scene = this,
-		_options = _util.extend({}, DEFAULT_OPTIONS, options),
+		_options = extend({}, DEFAULT_OPTIONS, options),
 		_state = SCENE_STATE_BEFORE,
 		_progress = 0,
 		_scrollOffset = {start: 0, end: 0}, // reflects the controllers's scroll position for the start and end of the scene respectively
@@ -77,7 +1075,7 @@ export default function Scene (options) {
 	var construct = function () {
 		for (var key in _options) { // check supplied options
 			if (!DEFAULT_OPTIONS.hasOwnProperty(key)) {
-				log(2, "WARNING: Unknown option \"" + key + "\"");
+				log$1(2, "WARNING: Unknown option \"" + key + "\"");
 				delete _options[key];
 			}
 		}
@@ -333,7 +1331,7 @@ var _listeners = {};
  * @returns {Scene} Parent object for chaining.
  */
 this.on = function (names, callback) {
-	if (_util.type.Function(callback)) {
+	if (type.Function(callback)) {
 		names = names.trim().split(' ');
 		names.forEach(function (fullname) {
 			var
@@ -351,7 +1349,7 @@ this.on = function (names, callback) {
 			}
 		});
 	} else {
-		log(1, "ERROR when calling '.on()': Supplied callback for '" + names + "' is not a valid function!");
+		log$1(1, "ERROR when calling '.on()': Supplied callback for '" + names + "' is not a valid function!");
 	}
 	return Scene;
 };
@@ -375,7 +1373,7 @@ this.on = function (names, callback) {
 */
 this.off = function (names, callback) {
 	if (!names) {
-		log(1, "ERROR: Invalid event name supplied.");
+		log$1(1, "ERROR: Invalid event name supplied.");
 		return Scene;
 	}
 	names = names.trim().split(' ');
@@ -421,16 +1419,16 @@ this.trigger = function (name, vars) {
 			eventname = nameparts[0],
 			namespace = nameparts[1],
 			listeners = _listeners[eventname];
-		log(3, 'event fired:', eventname, vars ? "->" : '', vars || '');
+		log$1(3, 'event fired:', eventname, vars ? "->" : '', vars || '');
 		if (listeners) {
 			listeners.forEach(function (listener, key) {
 				if (!namespace || namespace === listener.namespace) {
-					listener.callback.call(Scene, new Event(eventname, listener.namespace, Scene, vars));
+					listener.callback.call(Scene, new Event$1(eventname, listener.namespace, Scene, vars));
 				}
 			});
 		}
 	} else {
-		log(1, "ERROR: Invalid event name supplied.");
+		log$1(1, "ERROR: Invalid event name supplied.");
 	}
 	return Scene;
 };
@@ -466,10 +1464,10 @@ Scene
  * @param {number} loglevel - The loglevel required to initiate output for the message.
  * @param {...mixed} output - One or more variables that should be passed to the console.
  */
-var log = this._log = function (loglevel, output) {
+var log$1 = this._log = function (loglevel, output) {
 	if (_options.loglevel >= loglevel) {
 		Array.prototype.splice.call(arguments, 1, 0, "(" + NAMESPACE + ") ->");
-		_util.log.apply(window, arguments);
+		log.apply(window, arguments);
 	}
 };
 // (BUILD) - REMOVE IN MINIFY - END
@@ -488,7 +1486,7 @@ var log = this._log = function (loglevel, output) {
  */
 this.addTo = function (controller) {
 	if (!(controller instanceof ScrollMagic.Controller)) {
-		log(1, "ERROR: supplied argument of 'addTo()' is not a valid ScrollMagic Controller");
+		log$1(1, "ERROR: supplied argument of 'addTo()' is not a valid ScrollMagic Controller");
 	} else if (_controller != controller) {
 		// new controller
 		if (_controller) { // was associated to a different controller before, so remove it...
@@ -502,7 +1500,7 @@ this.addTo = function (controller) {
 		_controller.info("container").addEventListener('resize', onContainerResize);
 		controller.addScene(Scene);
 		Scene.trigger("add", {controller: _controller});
-		log(3, "added " + NAMESPACE + " to controller");
+		log$1(3, "added " + NAMESPACE + " to controller");
 		Scene.update();
 	}
 	return Scene;
@@ -552,7 +1550,7 @@ this.remove = function () {
 		_controller = undefined;
 		tmpParent.removeScene(Scene);
 		Scene.trigger("remove");
-		log(3, "removed " + NAMESPACE + " from controller");
+		log$1(3, "removed " + NAMESPACE + " from controller");
 	}
 	return Scene;
 };
@@ -574,7 +1572,7 @@ this.destroy = function (reset) {
 	Scene.trigger("destroy", {reset: reset});
 	Scene.remove();
 	Scene.off("*.*");
-	log(3, "destroyed " + NAMESPACE + " (reset: " + (reset ? "true" : "false") + ")");
+	log$1(3, "destroyed " + NAMESPACE + " (reset: " + (reset ? "true" : "false") + ")");
 	return null;
 };
 
@@ -831,7 +1829,7 @@ var updateTriggerElementPosition = function (suppressEvents) {
 			if (telem.parentNode) { // check if element is still attached to DOM
 				var
 					controllerInfo = _controller.info(),
-					containerOffset = _util.get.offset(controllerInfo.container), // container position is needed because element offset is returned in relation to document, not in relation to container.
+					containerOffset = get.offset(controllerInfo.container), // container position is needed because element offset is returned in relation to document, not in relation to container.
 					param = controllerInfo.vertical ? "top" : "left"; // which param is of interest ?
 					
 				// if parent is spacer, use spacer position instead so correct start position is returned for pinned elements.
@@ -839,7 +1837,7 @@ var updateTriggerElementPosition = function (suppressEvents) {
 					telem = telem.parentNode;
 				}
 
-				var elementOffset = _util.get.offset(telem);
+				var elementOffset = get.offset(telem);
 
 				if (!controllerInfo.isDocument) { // container is not the document root, so substract scroll Position to get correct trigger element position relative to scrollcontent
 					containerOffset[param] -= _controller.scrollPos();
@@ -848,7 +1846,7 @@ var updateTriggerElementPosition = function (suppressEvents) {
 				elementPos = elementOffset[param] - containerOffset[param];
 
 			} else { // there was an element, but it was removed from DOM
-				log(2, "WARNING: triggerElement was removed from DOM and will be reset to", undefined);
+				log$1(2, "WARNING: triggerElement was removed from DOM and will be reset to", undefined);
 				Scene.triggerElement(undefined); // unset, so a change event is triggered
 			}
 		}
@@ -877,17 +1875,17 @@ var onContainerResize = function (e) {
  * ----------------------------------------------------------------
  */
 
-var _validate = _util.extend(SCENE_OPTIONS.validate, {
+var _validate = extend(SCENE_OPTIONS.validate, {
 	// validation for duration handled internally for reference to private var _durationMethod
 	duration : function (val) {
-		if (_util.type.String(val) && val.match(/^(\.|\d)*\d+%$/)) {
+		if (type.String(val) && val.match(/^(\.|\d)*\d+%$/)) {
 			// percentage value
 			var perc = parseFloat(val) / 100;
 			val = function () {
 				return _controller ? _controller.info("size") * perc : 0;
 			};
 		}
-		if (_util.type.Function(val)) {
+		if (type.Function(val)) {
 			// function
 			_durationUpdateMethod = val;
 			try {
@@ -898,7 +1896,7 @@ var _validate = _util.extend(SCENE_OPTIONS.validate, {
 		}
 		// val has to be float
 		val = parseFloat(val);
-		if (!_util.type.Number(val) || val < 0) {
+		if (!type.Number(val) || val < 0) {
 			if (_durationUpdateMethod) {
 				_durationUpdateMethod = undefined;
 				throw ["Invalid return value of supplied function for option \"duration\":", val];
@@ -924,13 +1922,13 @@ var validateOption = function (check) {
 			} catch (e) { // validation failed -> reset to default
 				value = DEFAULT_OPTIONS[optionName];
 				// (BUILD) - REMOVE IN MINIFY - START
-				var logMSG = _util.type.String(e) ? [e] : e;
-				if (_util.type.Array(logMSG)) {
+				var logMSG = type.String(e) ? [e] : e;
+				if (type.Array(logMSG)) {
 					logMSG[0] = "ERROR: " + logMSG[0];
 					logMSG.unshift(1); // loglevel 1 for error msg
-					log.apply(this, logMSG);
+					log$1.apply(this, logMSG);
 				} else {
-					log(1, "ERROR: Problem executing validation callback for option '" + optionName + "':", e.message);
+					log$1(1, "ERROR: Problem executing validation callback for option '" + optionName + "':", e.message);
 				}
 				// (BUILD) - REMOVE IN MINIFY - END
 			} finally {
@@ -1220,15 +2218,15 @@ var updatePinState = function (forceUnpin) {
 
 		if (!forceUnpin && _state === SCENE_STATE_DURING) { // during scene or if duration is 0 and we are past the trigger
 			// pinned state
-			if (_util.css(pinTarget, "position") != "fixed") {
+			if (css(pinTarget, "position") != "fixed") {
 				// change state before updating pin spacer (position changes due to fixed collapsing might occur.)
-				_util.css(pinTarget, {"position": "fixed"});
+				css(pinTarget, {"position": "fixed"});
 				// update pin spacer
 				updatePinDimensions();
 			}
 
 			var
-				fixedPos = _util.get.offset(_pinOptions.spacer, true), // get viewport position of spacer
+				fixedPos = get.offset(_pinOptions.spacer, true), // get viewport position of spacer
 				scrollDistance = _options.reverse || _options.duration === 0 ?
 								 	 containerInfo.scrollPos - _scrollOffset.start // quicker
 								 : Math.round(_progress * _options.duration * 10)/10; // if no reverse and during pin the position needs to be recalculated using the progress
@@ -1237,7 +2235,7 @@ var updatePinState = function (forceUnpin) {
 			fixedPos[containerInfo.vertical ? "top" : "left"] += scrollDistance;
 
 			// set new values
-			_util.css(_pinOptions.spacer.firstChild, {
+			css(_pinOptions.spacer.firstChild, {
 				top: fixedPos.top,
 				left: fixedPos.left
 			});
@@ -1249,19 +2247,19 @@ var updatePinState = function (forceUnpin) {
 					top:  0,
 					left: 0
 				},
-				change = _util.css(pinTarget, "position") != newCSS.position;
+				change = css(pinTarget, "position") != newCSS.position;
 			
 			if (!_pinOptions.pushFollowers) {
 				newCSS[containerInfo.vertical ? "top" : "left"] = _options.duration * _progress;
 			} else if (_options.duration > 0) { // only concerns scenes with duration
-				if (_state === SCENE_STATE_AFTER && parseFloat(_util.css(_pinOptions.spacer, "padding-top")) === 0) {
+				if (_state === SCENE_STATE_AFTER && parseFloat(css(_pinOptions.spacer, "padding-top")) === 0) {
 					change = true; // if in after state but havent updated spacer yet (jumped past pin)
-				} else if (_state === SCENE_STATE_BEFORE && parseFloat(_util.css(_pinOptions.spacer, "padding-bottom")) === 0) { // before
+				} else if (_state === SCENE_STATE_BEFORE && parseFloat(css(_pinOptions.spacer, "padding-bottom")) === 0) { // before
 					change = true; // jumped past fixed state upward direction
 				}
 			}
 			// set new values
-			_util.css(pinTarget, newCSS);
+			css(pinTarget, newCSS);
 			if (change) {
 				// update pin spacer if state changed
 				updatePinDimensions();
@@ -1277,47 +2275,45 @@ var updatePinState = function (forceUnpin) {
  */
 var updatePinDimensions = function () {
 	if (_pin && _controller && _pinOptions.inFlow) { // no spacerresize, if original position is absolute
-		var
-			after = (_state === SCENE_STATE_AFTER),
-			before = (_state === SCENE_STATE_BEFORE),
+		var 
 			during = (_state === SCENE_STATE_DURING),
 			vertical = _controller.info("vertical"),
 			pinTarget = _pinOptions.spacer.firstChild, // usually the pined element but can also be another spacer (cascaded pins)
-			marginCollapse = _util.isMarginCollapseType(_util.css(_pinOptions.spacer, "display")),
-			css = {};
+			marginCollapse = isMarginCollapseType(css(_pinOptions.spacer, "display")),
+			css$1 = {};
 
 		// set new size
 		// if relsize: spacer -> pin | else: pin -> spacer
 		if (_pinOptions.relSize.width || _pinOptions.relSize.autoFullWidth) {
 			if (during) {
-				_util.css(_pin, {"width": _util.get.width(_pinOptions.spacer)});
+				css(_pin, {"width": get.width(_pinOptions.spacer)});
 			} else {
-				_util.css(_pin, {"width": "100%"});
+				css(_pin, {"width": "100%"});
 			}
 		} else {
 			// minwidth is needed for cascaded pins.
-			css["min-width"] = _util.get.width(vertical ? _pin : pinTarget, true, true);
-			css.width = during ? css["min-width"] : "auto";
+			css$1["min-width"] = get.width(vertical ? _pin : pinTarget, true, true);
+			css$1.width = during ? css$1["min-width"] : "auto";
 		}
 		if (_pinOptions.relSize.height) {
 			if (during) {
 				// the only padding the spacer should ever include is the duration (if pushFollowers = true), so we need to substract that.
-				_util.css(_pin, {"height": _util.get.height(_pinOptions.spacer) - (_pinOptions.pushFollowers ? _options.duration : 0)});
+				css(_pin, {"height": get.height(_pinOptions.spacer) - (_pinOptions.pushFollowers ? _options.duration : 0)});
 			} else {
-				_util.css(_pin, {"height": "100%"});
+				css(_pin, {"height": "100%"});
 			}
 		} else {
 			// margin is only included if it's a cascaded pin to resolve an IE9 bug
-			css["min-height"] = _util.get.height(vertical ? pinTarget : _pin, true , !marginCollapse); // needed for cascading pins
-			css.height = during ? css["min-height"] : "auto";
+			css$1["min-height"] = get.height(vertical ? pinTarget : _pin, true , !marginCollapse); // needed for cascading pins
+			css$1.height = during ? css$1["min-height"] : "auto";
 		}
 
 		// add space for duration if pushFollowers is true
 		if (_pinOptions.pushFollowers) {
-			css["padding" + (vertical ? "Top" : "Left")] = _options.duration * _progress;
-			css["padding" + (vertical ? "Bottom" : "Right")] = _options.duration * (1 - _progress);
+			css$1["padding" + (vertical ? "Top" : "Left")] = _options.duration * _progress;
+			css$1["padding" + (vertical ? "Bottom" : "Right")] = _options.duration * (1 - _progress);
 		}
-		_util.css(_pinOptions.spacer, css);
+		css(_pinOptions.spacer, css$1);
 	}
 };
 
@@ -1343,8 +2339,8 @@ var updateRelativePinSpacer = function () {
 	if ( _controller && _pin && // well, duh
 			_state === SCENE_STATE_DURING && // element in pinned state?
 			( // is width or height relatively sized, but not in relation to body? then we need to recalc.
-				((_pinOptions.relSize.width || _pinOptions.relSize.autoFullWidth) && _util.get.width(window) != _util.get.width(_pinOptions.spacer.parentNode)) ||
-				(_pinOptions.relSize.height && _util.get.height(window) != _util.get.height(_pinOptions.spacer.parentNode))
+				((_pinOptions.relSize.width || _pinOptions.relSize.autoFullWidth) && get.width(window) != get.width(_pinOptions.spacer.parentNode)) ||
+				(_pinOptions.relSize.height && get.height(window) != get.height(_pinOptions.spacer.parentNode))
 			)
 	) {
 		updatePinDimensions();
@@ -1394,15 +2390,15 @@ this.setPin = function (element, settings) {
 	// (BUILD) - REMOVE IN MINIFY - START
 	var pushFollowersActivelySet = settings && settings.hasOwnProperty('pushFollowers');
 	// (BUILD) - REMOVE IN MINIFY - END
-	settings = _util.extend({}, defaultSettings, settings);
+	settings = extend({}, defaultSettings, settings);
 
 	// validate Element
-	element = _util.get.elements(element)[0];
+	element = get.elements(element)[0];
 	if (!element) {
-		log(1, "ERROR calling method 'setPin()': Invalid pin element supplied.");
+		log$1(1, "ERROR calling method 'setPin()': Invalid pin element supplied.");
 		return Scene; // cancel
-	} else if (_util.css(element, "position") === "fixed") {
-		log(1, "ERROR calling method 'setPin()': Pin does not work with elements that are positioned 'fixed'.");
+	} else if (css(element, "position") === "fixed") {
+		log$1(1, "ERROR calling method 'setPin()': Pin does not work with elements that are positioned 'fixed'.");
 		return Scene; // cancel
 	}
 
@@ -1424,19 +2420,19 @@ this.setPin = function (element, settings) {
 
 	_pin.parentNode.style.display = 'none'; // hack start to force css to return stylesheet values instead of calculated px values.
 	var
-		inFlow = _util.css(_pin, "position") != "absolute",
-		pinCSS = _util.css(_pin, boundsParams.concat(["display"])),
-		sizeCSS = _util.css(_pin, ["width", "height"]);
+		inFlow = css(_pin, "position") != "absolute",
+		pinCSS = css(_pin, boundsParams.concat(["display"])),
+		sizeCSS = css(_pin, ["width", "height"]);
 	_pin.parentNode.style.display = parentDisplay; // hack end.
 
 	if (!inFlow && settings.pushFollowers) {
-		log(2, "WARNING: If the pinned element is positioned absolutely pushFollowers will be disabled.");
+		log$1(2, "WARNING: If the pinned element is positioned absolutely pushFollowers will be disabled.");
 		settings.pushFollowers = false;
 	}
 	// (BUILD) - REMOVE IN MINIFY - START
 	window.setTimeout(function () { // wait until all finished, because with responsive duration it will only be set after scene is added to controller
 		if (_pin && _options.duration === 0 && pushFollowersActivelySet && settings.pushFollowers) {
-			log(2, "WARNING: pushFollowers =", true, "has no effect, when scene duration is 0.");
+			log$1(2, "WARNING: pushFollowers =", true, "has no effect, when scene duration is 0.");
 		}
 	}, 0);
 	// (BUILD) - REMOVE IN MINIFY - END
@@ -1444,7 +2440,7 @@ this.setPin = function (element, settings) {
 	// create spacer and insert
 	var
 		spacer = _pin.parentNode.insertBefore(document.createElement('div'), _pin),
-		spacerCSS = _util.extend(pinCSS, {
+		spacerCSS = extend(pinCSS, {
 				position: inFlow ? "relative" : "absolute",
 				boxSizing: "content-box",
 				mozBoxSizing: "content-box",
@@ -1452,12 +2448,12 @@ this.setPin = function (element, settings) {
 			});
 
 	if (!inFlow) { // copy size if positioned absolutely, to work for bottom/right positioned elements.
-		_util.extend(spacerCSS, _util.css(_pin, ["width", "height"]));
+		extend(spacerCSS, css(_pin, ["width", "height"]));
 	}
 
-	_util.css(spacer, spacerCSS);
+	css(spacer, spacerCSS);
 	spacer.setAttribute(PIN_SPACER_ATTRIBUTE, "");
-	_util.addClass(spacer, settings.spacerClass);
+	addClass(spacer, settings.spacerClass);
 
 	// set the pin Options
 	_pinOptions = {
@@ -1465,7 +2461,7 @@ this.setPin = function (element, settings) {
 		relSize: { // save if size is defined using % values. if so, handle spacer resize differently...
 			width: sizeCSS.width.slice(-1) === "%",
 			height: sizeCSS.height.slice(-1) === "%",
-			autoFullWidth: sizeCSS.width === "auto" && inFlow && _util.isMarginCollapseType(pinCSS.display)
+			autoFullWidth: sizeCSS.width === "auto" && inFlow && isMarginCollapseType(pinCSS.display)
 		},
 		pushFollowers: settings.pushFollowers,
 		inFlow: inFlow, // stores if the element takes up space in the document flow
@@ -1483,16 +2479,16 @@ this.setPin = function (element, settings) {
 
 	// if relative size, transfer it to spacer and make pin calculate it...
 	if (_pinOptions.relSize.width) {
-		_util.css(spacer, {width: sizeCSS.width});
+		css(spacer, {width: sizeCSS.width});
 	}
 	if (_pinOptions.relSize.height) {
-		_util.css(spacer, {height: sizeCSS.height});
+		css(spacer, {height: sizeCSS.height});
 	}
 
 	// now place the pin element inside the spacer	
 	spacer.appendChild(_pin);
 	// and set new css
-	_util.css(_pin, {
+	css(_pin, {
 		position: inFlow ? "relative" : "absolute",
 		margin: "auto",
 		top: "auto",
@@ -1502,7 +2498,7 @@ this.setPin = function (element, settings) {
 	});
 	
 	if (_pinOptions.relSize.width || _pinOptions.relSize.autoFullWidth) {
-		_util.css(_pin, {
+		css(_pin, {
 			boxSizing : "border-box",
 			mozBoxSizing : "border-box",
 			webkitBoxSizing : "border-box"
@@ -1517,7 +2513,7 @@ this.setPin = function (element, settings) {
 	_pin.addEventListener("mousewheel", onMousewheelOverPin);
 	_pin.addEventListener("DOMMouseScroll", onMousewheelOverPin);
 
-	log(3, "added pin");
+	log$1(3, "added pin");
 
 	// finally update the pin to init
 	updatePinState();
@@ -1553,13 +2549,13 @@ this.removePin = function (reset) {
 				values.forEach(function (val) {
 					margins[val] = style[val] || "";
 				});
-				_util.css(pinTarget, margins);
+				css(pinTarget, margins);
 			}
 			_pinOptions.spacer.parentNode.insertBefore(pinTarget, _pinOptions.spacer);
 			_pinOptions.spacer.parentNode.removeChild(_pinOptions.spacer);
 			if (!_pin.parentNode.hasAttribute(PIN_SPACER_ATTRIBUTE)) { // if it's the last pin for this element -> restore inline styles
 				// TODO: only correctly set for first pin (when cascading) - how to fix?
-				_util.css(_pin, _pin.___origStyle);
+				css(_pin, _pin.___origStyle);
 				delete _pin.___origStyle;
 			}
 		}
@@ -1569,7 +2565,7 @@ this.removePin = function (reset) {
 		_pin.removeEventListener("mousewheel", onMousewheelOverPin);
 		_pin.removeEventListener("DOMMouseScroll", onMousewheelOverPin);
 		_pin = undefined;
-		log(3, "removed pin (reset: " + (reset ? "true" : "false") + ")");
+		log$1(3, "removed pin (reset: " + (reset ? "true" : "false") + ")");
 	}
 	return Scene;
 };
@@ -1606,9 +2602,9 @@ Scene
  * @returns {Scene} Parent object for chaining.
  */
 this.setClassToggle = function (element, classes) {
-	var elems = _util.get.elements(element);
-	if (elems.length === 0 || !_util.type.String(classes)) {
-		log(1, "ERROR calling method 'setClassToggle()': Invalid " + (elems.length === 0 ? "element" : "classes") + " supplied.");
+	var elems = get.elements(element);
+	if (elems.length === 0 || !type.String(classes)) {
+		log$1(1, "ERROR calling method 'setClassToggle()': Invalid " + (elems.length === 0 ? "element" : "classes") + " supplied.");
 		return Scene;
 	}
 	if (_cssClassElems.length > 0) {
@@ -1618,7 +2614,7 @@ this.setClassToggle = function (element, classes) {
 	_cssClasses = classes;
 	_cssClassElems = elems;
 	Scene.on("enter.internal_class leave.internal_class", function (e) {
-		var toggle = e.type === "enter" ? _util.addClass : _util.removeClass;
+		var toggle = e.type === "enter" ? addClass : removeClass;
 		_cssClassElems.forEach(function (elem, key) {
 			toggle(elem, _cssClasses);
 		});
@@ -1642,7 +2638,7 @@ this.setClassToggle = function (element, classes) {
 this.removeClassToggle = function (reset) {
 	if (reset) {
 		_cssClassElems.forEach(function (elem, key) {
-			_util.removeClass(elem, _cssClasses);
+			removeClass(elem, _cssClasses);
 		});
 	}
 	Scene.off("start.internal_class end.internal_class");
@@ -1654,8 +2650,7 @@ this.removeClassToggle = function (reset) {
 	// INIT
 	construct();
 	return Scene;
-};
-
+}
 // STATIC METHODS
 
 // store pagewide scene options
@@ -1671,7 +2666,7 @@ var SCENE_OPTIONS = {
 	validate: {
 		offset : function (val) {
 			val = parseFloat(val);
-			if (!_util.type.Number(val)) {
+			if (!type.Number(val)) {
 				throw ["Invalid value for option \"offset\":", val];
 			}
 			return val;
@@ -1679,7 +2674,7 @@ var SCENE_OPTIONS = {
 		triggerElement : function (val) {
 			val = val || undefined;
 			if (val) {
-				var elem = _util.get.elements(val)[0];
+				var elem = get.elements(val)[0];
 				if (elem && elem.parentNode) {
 					val = elem;
 				} else {
@@ -1690,7 +2685,7 @@ var SCENE_OPTIONS = {
 		},
 		triggerHook : function (val) {
 			var translate = {"onCenter" : 0.5, "onEnter" : 1, "onLeave" : 0};
-			if (_util.type.Number(val)) {
+			if (type.Number(val)) {
 				val = Math.max(0, Math.min(parseFloat(val), 1)); //  make sure its betweeen 0 and 1
 			} else if (val in translate) {
 				val = translate[val];
@@ -1705,7 +2700,7 @@ var SCENE_OPTIONS = {
 		// (BUILD) - REMOVE IN MINIFY - START
 		loglevel: function (val) {
 			val = parseInt(val);
-			if (!_util.type.Number(val) || val < 0 || val > 3) {
+			if (!type.Number(val) || val < 0 || val > 3) {
 				throw ["Invalid value for option \"loglevel\":", val];
 			}
 			return val;
@@ -1726,7 +2721,7 @@ Scene.addOption = function (name, defaultValue, validationCallback, shifts) {
 			SCENE_OPTIONS.shifts.push(name);
 		}
 	} else {
-		_util.log(1, "[static] ScrollMagic.Scene -> Cannot add Scene option '" + name + "', because it already exists.");
+		log(1, "[static] ScrollMagic.Scene -> Cannot add Scene option '" + name + "', because it already exists.");
 	}
 };
 // instance extension function for plugins
@@ -1735,10 +2730,25 @@ Scene.extend = function (extension) {
 	var oldClass = this;
 	Scene = function () {
 		oldClass.apply(this, arguments);
-		this.$super = _util.extend({}, this); // copy parent state
+		this.$super = extend({}, this); // copy parent state
 		return extension.apply(this, arguments) || this;
 	};
-	_util.extend(Scene, oldClass); // copy properties
+	extend(Scene, oldClass); // copy properties
 	Scene.prototype = oldClass.prototype; // copy prototype
 	Scene.prototype.constructor = Scene; // restore constructor
 };
+
+/*!
+ * @file ScrollMagic main library.
+ */
+
+function ScrollMagic$1 () {
+	log(2, '(COMPATIBILITY NOTICE) -> As of ScrollMagic 2.0.0 you need to use \'new ScrollMagic.Controller()\' to create a new controller instance. Use \'new ScrollMagic.Scene()\' to instance a scene.');
+}
+// TODO: temporary workaround for chrome's scroll jitter bug
+window.addEventListener("mousewheel", function () {});
+
+exports.Controller = Controller;
+exports.Scene = Scene;
+exports.ScrollMagic = ScrollMagic$1;
+exports.default = ScrollMagic$1;

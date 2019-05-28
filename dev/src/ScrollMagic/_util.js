@@ -2,8 +2,7 @@
  * TODO: DOCS (private for dev)
  */
 
-var _util = ScrollMagic._util = (function (window) {
-	var U = {}, i;
+	var i;
 	
 	/**
 	 * ------------------------------
@@ -25,7 +24,7 @@ var _util = ScrollMagic._util = (function (window) {
 		elem = (elem === document) ? window : elem;
 		if (elem === window) {
 			includeMargin = false;
-		} else if (!_type.DomElement(elem)) {
+		} else if (!type.DomElement(elem)) {
 			return 0;
 		}
 		which = which.charAt(0).toUpperCase() + which.substr(1).toLowerCase();
@@ -48,7 +47,7 @@ var _util = ScrollMagic._util = (function (window) {
 	 */
 
 	// extend obj – same as jQuery.extend({}, objA, objB)
-	U.extend = function (obj) {
+	export function extend (obj) {
 		obj = obj || {};
 		for (i = 1; i < arguments.length; i++) {
 			if (!arguments[i]) {
@@ -61,12 +60,12 @@ var _util = ScrollMagic._util = (function (window) {
 			}
 		}
 		return obj;
-	};
+	}
 
 	// check if a css display type results in margin-collapse or not
-	U.isMarginCollapseType = function (str) {
+	export function isMarginCollapseType (str) {
 		return ["block", "flex", "list-item", "table", "-webkit-box"].indexOf(str) > -1;
-	};
+	}
 
 	// implementation of requestAnimationFrame
 	// based on https://gist.github.com/paulirish/1579671
@@ -97,8 +96,8 @@ var _util = ScrollMagic._util = (function (window) {
 			window.clearTimeout(id);
 		};
 	}
-	U.rAF = _requestAnimationFrame.bind(window);
-	U.cAF = _cancelAnimationFrame.bind(window);
+	export const rAF = _requestAnimationFrame.bind(window);
+	export const cAF = _cancelAnimationFrame.bind(window);
 
 	// (BUILD) - REMOVE IN MINIFY - START
 	var
@@ -113,7 +112,7 @@ var _util = ScrollMagic._util = (function (window) {
 			console[method] = console.log; // prefer .log over nothing
 		}
 	}
-	U.log = function (loglevel) {
+	export function log (loglevel) {
 		if (loglevel > loglevels.length || loglevel <= 0) loglevel = loglevels.length;
 		var now = new Date(),
 			time = ("0"+now.getHours()).slice(-2) + ":" + ("0"+now.getMinutes()).slice(-2) + ":" + ("0"+now.getSeconds()).slice(-2) + ":" + ("00"+now.getMilliseconds()).slice(-3),
@@ -122,7 +121,7 @@ var _util = ScrollMagic._util = (function (window) {
 			func = Function.prototype.bind.call(console[method], console);
 		args.unshift(time);
 		func.apply(console, args);
-	};
+	}
 	// (BUILD) - REMOVE IN MINIFY - END
 
 	/**
@@ -131,22 +130,22 @@ var _util = ScrollMagic._util = (function (window) {
 	 * ------------------------------
 	 */
 
-	var _type = U.type = function (v) {
+	export function type (v) {
 		return Object.prototype.toString.call(v).replace(/^\[object (.+)\]$/, "$1").toLowerCase();
+	}
+	type.String = function (v) {
+		return type(v) === 'string';
 	};
-	_type.String = function (v) {
-		return _type(v) === 'string';
+	type.Function = function (v) {
+		return type(v) === 'function';
 	};
-	_type.Function = function (v) {
-		return _type(v) === 'function';
-	};
-	_type.Array = function (v) {
+	type.Array = function (v) {
 		return Array.isArray(v);
 	};
-	_type.Number = function (v) {
-		return !_type.Array(v) && (v - parseFloat(v) + 1) >= 0;
+	type.Number = function (v) {
+		return !type.Array(v) && (v - parseFloat(v) + 1) >= 0;
 	};
-	_type.DomElement = function (o){
+	type.DomElement = function (o){
 		return (
 			typeof HTMLElement === "object" || typeof HTMLElement === "function"? o instanceof HTMLElement || o instanceof SVGElement : //DOM2
 			o && typeof o === "object" && o !== null && o.nodeType === 1 && typeof o.nodeName==="string"
@@ -159,53 +158,53 @@ var _util = ScrollMagic._util = (function (window) {
 	 * ------------------------------
 	 */
 	// always returns a list of matching DOM elements, from a selector, a DOM element or an list of elements or even an array of selectors
-	var _get = U.get = {};
-	_get.elements = function (selector) {
+	export const get = {};
+	get.elements = function (selector) {
 		var arr = [];
-		if (_type.String(selector)) {
+		if (type.String(selector)) {
 			try {
 				selector = document.querySelectorAll(selector);
 			} catch (e) { // invalid selector
 				return arr;
 			}
 		}
-		if (_type(selector) === 'nodelist' || _type.Array(selector) || selector instanceof NodeList) {
+		if (type(selector) === 'nodelist' || type.Array(selector) || selector instanceof NodeList) {
 			for (var i = 0, ref = arr.length = selector.length; i < ref; i++) { // list of elements
 				var elem = selector[i];
-				arr[i] = _type.DomElement(elem) ? elem : _get.elements(elem); // if not an element, try to resolve recursively
+				arr[i] = type.DomElement(elem) ? elem : get.elements(elem); // if not an element, try to resolve recursively
 			}
-		} else if (_type.DomElement(selector) || selector === document || selector === window){
+		} else if (type.DomElement(selector) || selector === document || selector === window){
 			arr = [selector]; // only the element
 		}
 		return arr;
 	};
 	// get scroll top value
-	_get.scrollTop = function (elem) {
+	get.scrollTop = function (elem) {
 		return (elem && typeof elem.scrollTop === 'number') ? elem.scrollTop : window.pageYOffset || 0;
 	};
 	// get scroll left value
-	_get.scrollLeft = function (elem) {
+	get.scrollLeft = function (elem) {
 		return (elem && typeof elem.scrollLeft === 'number') ? elem.scrollLeft : window.pageXOffset || 0;
 	};
 	// get element height
-	_get.width = function (elem, outer, includeMargin) {
+	get.width = function (elem, outer, includeMargin) {
 		return _dimension('width', elem, outer, includeMargin);
 	};
 	// get element width
-	_get.height = function (elem, outer, includeMargin) {
+	get.height = function (elem, outer, includeMargin) {
 		return _dimension('height', elem, outer, includeMargin);
 	};
 
 	// get element position (optionally relative to viewport)
-	_get.offset = function (elem, relativeToViewport) {
+	get.offset = function (elem, relativeToViewport) {
 		var offset = {top: 0, left: 0};
 		if (elem && elem.getBoundingClientRect) { // check if available
 			var rect = elem.getBoundingClientRect();
 			offset.top = rect.top;
 			offset.left = rect.left;
 			if (!relativeToViewport) { // clientRect is by default relative to viewport...
-				offset.top += _get.scrollTop();
-				offset.left += _get.scrollLeft();
+				offset.top += get.scrollTop();
+				offset.left += get.scrollLeft();
 			}
 		}
 		return offset;
@@ -217,29 +216,29 @@ var _util = ScrollMagic._util = (function (window) {
 	 * ------------------------------
 	 */
 
-	U.addClass = function(elem, classname) {
+	export function addClass (elem, classname) {
 		if (classname) {
 			if (elem.classList)
 				elem.classList.add(classname);
 			else
 				elem.className += ' ' + classname;
 		}
-	};
-	U.removeClass = function(elem, classname) {
+	}
+	export function removeClass (elem, classname) {
 		if (classname) {
 			if (elem.classList)
 				elem.classList.remove(classname);
 			else
 				elem.className = elem.className.replace(new RegExp('(^|\\b)' + classname.split(' ').join('|') + '(\\b|$)', 'gi'), ' ');
 		}
-	};
+	}
 	// if options is string -> returns css value
 	// if options is array -> returns object with css value pairs
 	// if options is object -> set new css values
-	U.css = function (elem, options) {
-		if (_type.String(options)) {
+	export function css (elem, options) {
+		if (type.String(options)) {
 			return _getComputedStyle(elem)[_camelCase(options)];
-		} else if (_type.Array(options)) {
+		} else if (type.Array(options)) {
 			var
 				obj = {},
 				style = _getComputedStyle(elem);
@@ -256,7 +255,4 @@ var _util = ScrollMagic._util = (function (window) {
 				elem.style[_camelCase(option)] = val;
 			}
 		}
-	};
-
-	return U;
-}(window || {}));
+	}
