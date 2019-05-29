@@ -1,0 +1,26 @@
+{
+  "scrollmagic/minified/ScrollMagic.min.js": {
+    "bundled": 103183,
+    "minified": 20629,
+    "gzipped": 7258
+  },
+  "esm/ScrollMagic.js": {
+    "bundled": 100163,
+    "minified": 21926,
+    "gzipped": 7391,
+    "treeshaked": {
+      "rollup": {
+        "code": 20120,
+        "import_statements": 0
+      },
+      "webpack": {
+        "code": 21075
+      }
+    }
+  },
+  "scrollmagic/uncompressed/ScrollMagic.js": {
+    "bundled": 103183,
+    "minified": 20629,
+    "gzipped": 7258
+  }
+}

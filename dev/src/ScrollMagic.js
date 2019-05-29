@@ -47,10 +47,10 @@
 */
 import Controller from './ScrollMagic/Controller';
 import Scene from './ScrollMagic/Scene';
-import * as _util from './ScrollMagic/_util';
+import { log } from './ScrollMagic/_util';
 
 export default function ScrollMagic () {
-	_util.log(2, '(COMPATIBILITY NOTICE) -> As of ScrollMagic 2.0.0 you need to use \'new ScrollMagic.Controller()\' to create a new controller instance. Use \'new ScrollMagic.Scene()\' to instance a scene.');
+	log(2, '(COMPATIBILITY NOTICE) -> As of ScrollMagic 2.0.0 you need to use \'new ScrollMagic.Controller()\' to create a new controller instance. Use \'new ScrollMagic.Scene()\' to instance a scene.');
 };
 
 // TODO: temporary workaround for chrome's scroll jitter bug

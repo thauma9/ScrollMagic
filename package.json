@@ -12,7 +12,8 @@
     "url": "git://github.com/janpaepke/ScrollMagic.git"
   },
   "license": "(MIT OR GPL-3.0+)",
-  "main": "scrollmagic/uncompressed/ScrollMagic.js",
+  "main": "cjs/scrollmagic.js",
+  "module": "esm/ScrollMagic",
   "engines": {
     "node": ">=0.10.x"
   },
@@ -42,7 +43,10 @@
     "pretty-bytes": "^5.1.0",
     "requirejs": "^2.3.6",
     "rollup": "^1.12.4",
+    "rollup-plugin-commonjs": "^10.0.0",
+    "rollup-plugin-node-resolve": "^5.0.0",
     "rollup-plugin-replace": "^2.2.0",
+    "rollup-plugin-size-snapshot": "^0.9.0",
     "rollup-plugin-uglify": "^6.0.2",
     "semver": "^5.5.1",
     "through2": "^2.0.3",
@@ -56,7 +60,8 @@
   "scripts": {
     "test": "./node_modules/karma/bin/karma start ./dev/tests/karma.conf.js",
     "start": "node ./node_modules/gulp/bin/gulp open-demo",
-    "build": "node ./node_modules/gulp/bin/gulp"
+    "build": "node ./node_modules/gulp/bin/gulp",
+    "rollup": "rollup -c"
   },
   "homepage": "http://ScrollMagic.io",
   "keywords": [
