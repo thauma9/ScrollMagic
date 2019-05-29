@@ -1,3 +1,7 @@
+import Scene from '../ScrollMagic/Scene';
+import Controller from '../ScrollMagic/Controller';
+import * as _util from '../ScrollMagic/_util';
+
 /*!
  * @file Debug Extension for ScrollMagic.
  */
@@ -9,28 +13,30 @@
  * To have access to this extension, please include `plugins/debug.addIndicators.js`.
  * @mixin debug.addIndicators
  */
-(function (root, factory) {
-    if (typeof define === 'function' && define.amd) {
-        // AMD. Register as an anonymous module.
-        define(['ScrollMagic'], factory);
-    } else if (typeof exports === 'object') {
-    		// CommonJS
-    		factory(require('scrollmagic'));
-    } else {
-    		// no browser global export needed, just execute
-        factory(root.ScrollMagic || (root.jQuery && root.jQuery.ScrollMagic));
-    }
-}(this, function(ScrollMagic) {
-	"use strict";
+// (function (root, factory) {
+//     if (typeof define === 'function' && define.amd) {
+//         // AMD. Register as an anonymous module.
+//         define(['ScrollMagic'], factory);
+//     } else if (typeof exports === 'object') {
+//     		// CommonJS
+//     		factory(require('scrollmagic'));
+//     } else {
+//     		// no browser global export needed, just execute
+//         factory(root.ScrollMagic || (root.jQuery && root.jQuery.ScrollMagic));
+//     }
+// }(this, function(ScrollMagic) {
+// 	"use strict";
+
+export default function addIndicators() {
 	var NAMESPACE = "debug.addIndicators";
 
 	// (BUILD) - REMOVE IN MINIFY - START
-	var
-		console = window.console || {},
-		err = Function.prototype.bind.call(console.error || console.log || function() {}, console);
-	if (!ScrollMagic) {
-		err("(" + NAMESPACE + ") -> ERROR: The ScrollMagic main module could not be found. Please make sure it's loaded before this plugin or use an asynchronous loader like requirejs.");
-	}
+	// var
+	// 	console = window.console || {},
+	// 	err = Function.prototype.bind.call(console.error || console.log || function() {}, console);
+	// if (!ScrollMagic) {
+	// 	err("(" + NAMESPACE + ") -> ERROR: The ScrollMagic main module could not be found. Please make sure it's loaded before this plugin or use an asynchronous loader like requirejs.");
+	// }
 	// (BUILD) - REMOVE IN MINIFY - END
 
 	// plugin settings
@@ -41,12 +47,11 @@
 
 	// overall vars
 	var
-		_util = ScrollMagic._util,
 		_autoindex = 0;
 
 
 
-	ScrollMagic.Scene.extend(function () {
+	Scene.extend(function () {
 		var
 			Scene = this,
 			_indicator;
@@ -61,7 +66,7 @@
 		// (BUILD) - REMOVE IN MINIFY - END
 
 		/**
-		 * Add visual indicators for a ScrollMagic.Scene.  
+		 * Add visual indicators for a ScrollMagic.Scene.
 		 * @memberof! debug.addIndicators#
 		 *
 		 * @example
@@ -72,7 +77,7 @@
 		 * scene.addIndicators({name: "pin scene", colorEnd: "#FFFFFF"});
 		 *
 		 * @param {object} [options] - An object containing one or more options for the indicators.
-		 * @param {(string|object)} [options.parent] - A selector, DOM Object or a jQuery object that the indicators should be added to.  
+		 * @param {(string|object)} [options.parent] - A selector, DOM Object or a jQuery object that the indicators should be added to.
 		 														 														 If undefined, the controller's container will be used.
 		 * @param {number} [options.name=""] - This string will be displayed at the start and end indicators of the scene for identification purposes. If no name is supplied an automatic index will be used.
 		 * @param {number} [options.indent=0] - Additional position offset for the indicators (useful, when having multiple scenes starting at the same position).
@@ -91,7 +96,7 @@
 						colorEnd: "red",
 						colorTrigger: "blue",
 					};
-				
+
 				options = _util.extend({}, DEFAULT_OPTIONS, options);
 
 				_autoindex++;
@@ -137,7 +142,7 @@
 	 */
 	// add option to globally auto-add indicators to scenes
 	/**
-	 * Every ScrollMagic.Controller instance now accepts an additional option.  
+	 * Every ScrollMagic.Controller instance now accepts an additional option.
 	 * See {@link ScrollMagic.Controller} for a complete list of the standard options.
 	 * @memberof! debug.addIndicators#
 	 * @method new ScrollMagic.Controller(options)
@@ -151,9 +156,9 @@
 	 * @param {object} [options] - Options for the Controller.
 	 * @param {boolean} [options.addIndicators=false] - If set to `true` every scene that is added to the controller will automatically get indicators added to it.
 	 */
-	ScrollMagic.Controller.addOption("addIndicators", false);
+	Controller.addOption("addIndicators", false);
 	// extend Controller
-	ScrollMagic.Controller.extend(function () {
+	Controller.extend(function () {
 		var
 			Controller = this,
 			_info = Controller.info(),
@@ -175,7 +180,7 @@
 			log(2, "WARNING: Scene already has a property '_indicators', which will be overwritten by plugin.");
 		}
 		// (BUILD) - REMOVE IN MINIFY - END
-	
+
 		// add indicators container
 		this._indicators = _indicators;
 		/*
@@ -186,7 +191,7 @@
 			bounds position on container scroll or resize (to keep alignment to bottom/right)
 			trigger position on container resize, window resize (if container isn't document) and window scroll (if container isn't document)
 		*/
-		
+
 		// event handler for when associated bounds markers need to be repositioned
 		var handleBoundsPositionChange = function () {
 			_indicators.updateBoundsPositions();
@@ -286,7 +291,7 @@
 		// add indicators if global option is set
 		this.addScene = function (newScene) {
 
-			if (this._options.addIndicators && newScene instanceof ScrollMagic.Scene && newScene.controller() === Controller) {
+			if (this._options.addIndicators && newScene instanceof Scene && newScene.controller() === Controller) {
 				newScene.addIndicators();
 			}
 			// call original destroy method
@@ -396,7 +401,7 @@
 	 				removeTriggerGroup();
 	 			}
 				removeBounds();
-				
+
 				log(3, "removed indicators");
 			}
 		};
@@ -504,7 +509,7 @@
 		};
 
 		// updates the trigger group -> either join existing or add new one
-		/*	
+		/*
 		 * Logic:
 		 * 1 if a trigger group exist, check if it's in sync with Scene settings – if so, nothing else needs to happen
 		 * 2 try to find an existing one that matches Scene parameters
@@ -645,7 +650,7 @@
 				position: "relative",
 			});
 			// inner wrapper for right: 0 and main element has no size
-			var w = document.createElement('div'); 
+			var w = document.createElement('div');
 			_util.css(w, {
 				position: "absolute",
 				overflow: "visible",
@@ -669,5 +674,6 @@
 			return e;
 		},
 	};
+}
 
-}));
+// }));

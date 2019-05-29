@@ -45,14 +45,17 @@ const cjs = [
 
 const esm = [
   {
-    input,
-    output: { file: "esm/ScrollMagic.js", format: "esm" },
+    input: {
+      ScrollMagic: input,
+      'plugins/debug.addIndicators': 'dev/src/plugins/debug.addIndicators.js'
+    },
+    output: { dir: "esm", format: "esm" },
     external,
     plugins: [
       replace({
         ...baseReplacements
       }),
-      sizeSnapshot()
+      // sizeSnapshot()
     ]
   }
 ];

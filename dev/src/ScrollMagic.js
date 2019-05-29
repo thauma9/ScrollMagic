@@ -48,6 +48,7 @@
 import Controller from './ScrollMagic/Controller';
 import Scene from './ScrollMagic/Scene';
 import { log } from './ScrollMagic/_util';
+import addIndicators from './plugins/debug.addIndicators';
 
 export default function ScrollMagic () {
 	log(2, '(COMPATIBILITY NOTICE) -> As of ScrollMagic 2.0.0 you need to use \'new ScrollMagic.Controller()\' to create a new controller instance. Use \'new ScrollMagic.Scene()\' to instance a scene.');
@@ -56,4 +57,4 @@ export default function ScrollMagic () {
 // TODO: temporary workaround for chrome's scroll jitter bug
 window.addEventListener("mousewheel", function () {});
 
-export { ScrollMagic, Controller, Scene }
+export { ScrollMagic, Controller, Scene, addIndicators }
