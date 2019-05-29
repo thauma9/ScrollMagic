@@ -1,9 +1,9 @@
 // import babel from 'rollup-plugin-babel';
-// import replace from 'rollup-plugin-replace';
+import replace from 'rollup-plugin-replace';
 // import commonjs from 'rollup-plugin-commonjs';
 // import nodeResolve from 'rollup-plugin-node-resolve';
 // import { sizeSnapshot } from 'rollup-plugin-size-snapshot';
-// import { uglify } from 'rollup-plugin-uglify';
+import { uglify } from 'rollup-plugin-uglify';
 
 import pkg from './package.json';
 
@@ -14,6 +14,10 @@ function external(id) {
   return !id.startsWith('.') && !id.startsWith('/');
 }
 
+const baseReplacements = {
+  '__VERSION__': JSON.stringify(pkg.version)
+}
+
 const cjs = [
   {
     input,
@@ -21,7 +25,10 @@ const cjs = [
     external,
     plugins: [
       // babel({ exclude: /node_modules/ }),
-      // replace({ 'process.env.NODE_ENV': JSON.stringify('development') })
+      replace({
+        // 'process.env.NODE_ENV': JSON.stringify('development')
+        ...baseReplacements
+      })
     ]
   },
 
@@ -31,8 +38,11 @@ const cjs = [
     external,
     plugins: [
       // babel({ exclude: /node_modules/ }),
-      // replace({ 'process.env.NODE_ENV': JSON.stringify('production') }),
-      // uglify()
+      replace({
+        // 'process.env.NODE_ENV': JSON.stringify('production')
+        ...baseReplacements
+      }),
+      uglify()
     ]
   }
 ];

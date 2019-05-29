@@ -3,7 +3,7 @@
  */
 
 	var i;
-	
+
 	/**
 	 * ------------------------------
 	 * internal helpers
@@ -96,8 +96,8 @@
 			window.clearTimeout(id);
 		};
 	}
-	export const rAF = _requestAnimationFrame.bind(window);
-	export const cAF = _cancelAnimationFrame.bind(window);
+	export var rAF = _requestAnimationFrame.bind(window);
+	export var cAF = _cancelAnimationFrame.bind(window);
 
 	// (BUILD) - REMOVE IN MINIFY - START
 	var
@@ -158,7 +158,7 @@
 	 * ------------------------------
 	 */
 	// always returns a list of matching DOM elements, from a selector, a DOM element or an list of elements or even an array of selectors
-	export const get = {};
+	export var get = {};
 	get.elements = function (selector) {
 		var arr = [];
 		if (type.String(selector)) {

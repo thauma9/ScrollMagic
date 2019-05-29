@@ -1,4 +1,6 @@
 import * as _util from './_util';
+import { PIN_SPACER_ATTRIBUTE } from './constants';
+import Scene from './Scene';
 /**
  * The main class that is needed once per scroll container.
  *
@@ -20,12 +22,12 @@ import * as _util from './_util';
 										 ** `1` => errors
 										 ** `2` => errors, warnings
 										 ** `3` => errors, warnings, debuginfo
- * @param {boolean} [options.refreshInterval=100] - Some changes don't call events by default, like changing the container size or moving a scene trigger element.  
- 																										 This interval polls these parameters to fire the necessary events.  
+ * @param {boolean} [options.refreshInterval=100] - Some changes don't call events by default, like changing the container size or moving a scene trigger element.
+ 																										 This interval polls these parameters to fire the necessary events.
  																										 If you don't use custom containers, trigger elements or have static layouts, where the positions of the trigger elements don't change, you can set this to 0 disable interval checking and improve performance.
  *
  */
- 
+
 export default function Controller (options) {
 	/*
 	 * ----------------------------------------------------------------
@@ -95,7 +97,7 @@ export default function Controller (options) {
 		_options.refreshInterval = _util.type.Number(ri) ? ri : DEFAULT_OPTIONS.refreshInterval;
 		scheduleRefresh();
 
-		log(3, "added new " + NAMESPACE + " controller (v" + ScrollMagic.version + ")");
+		log(3, "added new " + NAMESPACE + " controller (v" + __VERSION__ + ")");
 	};
 
 	/**
@@ -178,7 +180,7 @@ export default function Controller (options) {
 			// (BUILD) - REMOVE IN MINIFY - END
 		}
 	};
-	
+
 	/**
 	* Initializes rAF callback
 	* @private
@@ -186,7 +188,7 @@ export default function Controller (options) {
 	var debounceUpdate = function () {
 		_updateTimeout = _util.rAF(updateScenes);
 	};
-	
+
 	/**
 	* Handles Container changes
 	* @private
@@ -270,7 +272,7 @@ export default function Controller (options) {
 	 */
 
 	/**
-	 * Add one ore more scene(s) to the controller.  
+	 * Add one ore more scene(s) to the controller.
 	 * This is the equivalent to `Scene.addTo(controller)`.
 	 * @public
 	 * @example
@@ -278,10 +280,10 @@ export default function Controller (options) {
 	 * controller.addScene(scene);
 	 *
  	 * // with a newly created scene.
-	 * controller.addScene(new ScrollMagic.Scene({duration : 0}));
+	 * controller.addScene(new Scene({duration : 0}));
 	 *
  	 * // adding multiple scenes
-	 * controller.addScene([scene, scene2, new ScrollMagic.Scene({duration : 0})]);
+	 * controller.addScene([scene, scene2, new Scene({duration : 0})]);
 	 *
 	 * @param {(ScrollMagic.Scene|array)} newScene - ScrollMagic Scene or Array of Scenes to be added to the controller.
 	 * @return {Controller} Parent object for chaining.
@@ -291,7 +293,7 @@ export default function Controller (options) {
 			newScene.forEach(function (scene, index) {
 				Controller.addScene(scene);
 			});
-		} else if (newScene instanceof ScrollMagic.Scene) {
+		} else if (newScene instanceof Scene) {
 			if (newScene.controller() !== Controller) {
 				newScene.addTo(Controller);
 			} else if (_sceneObjects.indexOf(newScene) < 0){
@@ -316,7 +318,7 @@ export default function Controller (options) {
 	};
 
 	/**
-	 * Remove one ore more scene(s) from the controller.  
+	 * Remove one ore more scene(s) from the controller.
 	 * This is the equivalent to `Scene.remove()`.
 	 * @public
 	 * @example
@@ -347,10 +349,10 @@ export default function Controller (options) {
 	};
 
 	/**
-	 * Update one ore more scene(s) according to the scroll position of the container.  
-	 * This is the equivalent to `Scene.update()`.  
-	 * The update method calculates the scene's start and end position (based on the trigger element, trigger hook, duration and offset) and checks it against the current scroll position of the container.  
-	 * It then updates the current scene state accordingly (or does nothing, if the state is already correct) – Pins will be set to their correct position and tweens will be updated to their correct progress.  
+	 * Update one ore more scene(s) according to the scroll position of the container.
+	 * This is the equivalent to `Scene.update()`.
+	 * The update method calculates the scene's start and end position (based on the trigger element, trigger hook, duration and offset) and checks it against the current scroll position of the container.
+	 * It then updates the current scene state accordingly (or does nothing, if the state is already correct) – Pins will be set to their correct position and tweens will be updated to their correct progress.
 	 * _**Note:** This method gets called constantly whenever Controller detects a change. The only application for you is if you change something outside of the realm of ScrollMagic, like moving the trigger or changing tween parameters._
 	 * @public
 	 * @example
@@ -364,23 +366,23 @@ export default function Controller (options) {
 	 * controller.updateScene([scene1, scene2, scene3]);
 	 *
 	 * @param {ScrollMagic.Scene} Scene - ScrollMagic Scene or Array of Scenes that is/are supposed to be updated.
-	 * @param {boolean} [immediately=false] - If `true` the update will be instant, if `false` it will wait until next update cycle.  
+	 * @param {boolean} [immediately=false] - If `true` the update will be instant, if `false` it will wait until next update cycle.
 	 										  This is useful when changing multiple properties of the scene - this way it will only be updated once all new properties are set (updateScenes).
 	 * @return {Controller} Parent object for chaining.
 	 */
-	this.updateScene = function (Scene, immediately) {
-		if (_util.type.Array(Scene)) {
-			Scene.forEach(function (scene, index) {
+	this.updateScene = function (scene, immediately) {
+		if (_util.type.Array(scene)) {
+			scene.forEach(function (scene, index) {
 				Controller.updateScene(scene, immediately);
 			});
 		} else {
 			if (immediately) {
-				Scene.update(true);
-			} else if (_updateScenesOnNextCycle !== true && Scene instanceof ScrollMagic.Scene) { // if _updateScenesOnNextCycle is true, all connected scenes are already scheduled for update
+				scene.update(true);
+			} else if (_updateScenesOnNextCycle !== true && scene instanceof Scene) { // if _updateScenesOnNextCycle is true, all connected scenes are already scheduled for update
 				// prep array for next update cycle
 				_updateScenesOnNextCycle = _updateScenesOnNextCycle || [];
-				if (_updateScenesOnNextCycle.indexOf(Scene) == -1) {
-					_updateScenesOnNextCycle.push(Scene);	
+				if (_updateScenesOnNextCycle.indexOf(scene) == -1) {
+					_updateScenesOnNextCycle.push(scene);
 				}
 				_updateScenesOnNextCycle = sortScenes(_updateScenesOnNextCycle); // sort
 				debounceUpdate();
@@ -390,10 +392,10 @@ export default function Controller (options) {
 	};
 
 	/**
-	 * Updates the controller params and calls updateScene on every scene, that is attached to the controller.  
-	 * See `Controller.updateScene()` for more information about what this means.  
-	 * In most cases you will not need this function, as it is called constantly, whenever ScrollMagic detects a state change event, like resize or scroll.  
-	 * The only application for this method is when ScrollMagic fails to detect these events.  
+	 * Updates the controller params and calls updateScene on every scene, that is attached to the controller.
+	 * See `Controller.updateScene()` for more information about what this means.
+	 * In most cases you will not need this function, as it is called constantly, whenever ScrollMagic detects a state change event, like resize or scroll.
+	 * The only application for this method is when ScrollMagic fails to detect these events.
 	 * One application is with some external scroll libraries (like iScroll) that move an internal container to a negative offset instead of actually scrolling. In this case the update on the controller needs to be called whenever the child container's position changes.
 	 * For this case there will also be the need to provide a custom function to calculate the correct scroll position. See `Controller.scrollPos()` for details.
 	 * @public
@@ -416,7 +418,7 @@ export default function Controller (options) {
 	};
 
 	/**
-	 * Scroll to a numeric scroll offset, a DOM element, the start of a scene or provide an alternate method for scrolling.  
+	 * Scroll to a numeric scroll offset, a DOM element, the start of a scene or provide an alternate method for scrolling.
 	 * For vertical controllers it will change the top scroll offset and for horizontal applications it will change the left offset.
 	 * @public
 	 *
@@ -465,13 +467,13 @@ export default function Controller (options) {
 	 *
 	 * @param {mixed} scrollTarget - The supplied argument can be one of these types:
 	 * 1. `number` -> The container will scroll to this new scroll offset.
-	 * 2. `string` or `object` -> Can be a selector or a DOM object.  
+	 * 2. `string` or `object` -> Can be a selector or a DOM object.
 	 *  The container will scroll to the position of this element.
 	 * 3. `ScrollMagic Scene` -> The container will scroll to the start of this scene.
-	 * 4. `function` -> This function will be used for future scroll position modifications.  
-	 *  This provides a way for you to change the behaviour of scrolling and adding new behaviour like animation. The function receives the new scroll position as a parameter and a reference to the container element using `this`.  
-	 *  It may also optionally receive an optional additional parameter (see below)  
-	 *  _**NOTE:**  
+	 * 4. `function` -> This function will be used for future scroll position modifications.
+	 *  This provides a way for you to change the behaviour of scrolling and adding new behaviour like animation. The function receives the new scroll position as a parameter and a reference to the container element using `this`.
+	 *  It may also optionally receive an optional additional parameter (see below)
+	 *  _**NOTE:**
 	 *  All other options will still work as expected, using the new function to scroll._
 	 * @param {mixed} [additionalParameter] - If a custom scroll function was defined (see above 4.), you may want to supply additional parameters to it, when calling it. You can do this using this parameter – see examples for details. Please note, that this parameter will have no effect, if you use the default scrolling function.
 	 * @returns {Controller} Parent object for chaining.
@@ -479,7 +481,7 @@ export default function Controller (options) {
 	this.scrollTo = function (scrollTarget, additionalParameter) {
 		if (_util.type.Number(scrollTarget)) { // excecute
 			setScrollPos.call(_options.container, scrollTarget, additionalParameter);
-		} else if (scrollTarget instanceof ScrollMagic.Scene) { // scroll to scene
+		} else if (scrollTarget instanceof Scene) { // scroll to scene
 			if (scrollTarget.controller() === Controller) { // check if the controller is associated with this scene
 				Controller.scrollTo(scrollTarget.scrollOffset(), additionalParameter);
 			} else {
@@ -513,17 +515,17 @@ export default function Controller (options) {
 	};
 
 	/**
-	 * **Get** the current scrollPosition or **Set** a new method to calculate it.  
+	 * **Get** the current scrollPosition or **Set** a new method to calculate it.
 	 * -> **GET**:
-	 * When used as a getter this function will return the current scroll position.  
-	 * To get a cached value use Controller.info("scrollPos"), which will be updated in the update cycle.  
+	 * When used as a getter this function will return the current scroll position.
+	 * To get a cached value use Controller.info("scrollPos"), which will be updated in the update cycle.
 	 * For vertical controllers it will return the top scroll offset and for horizontal applications it will return the left offset.
 	 *
 	 * -> **SET**:
-	 * When used as a setter this method prodes a way to permanently overwrite the controller's scroll position calculation.  
-	 * A typical usecase is when the scroll position is not reflected by the containers scrollTop or scrollLeft values, but for example by the inner offset of a child container.  
-	 * Moving a child container inside a parent is a commonly used method for several scrolling frameworks, including iScroll.  
-	 * By providing an alternate calculation function you can make sure ScrollMagic receives the correct scroll position.  
+	 * When used as a setter this method prodes a way to permanently overwrite the controller's scroll position calculation.
+	 * A typical usecase is when the scroll position is not reflected by the containers scrollTop or scrollLeft values, but for example by the inner offset of a child container.
+	 * Moving a child container inside a parent is a commonly used method for several scrolling frameworks, including iScroll.
+	 * By providing an alternate calculation function you can make sure ScrollMagic receives the correct scroll position.
 	 * Please also bear in mind that your function should return y values for vertical scrolls an x for horizontals.
 	 *
 	 * To change the current scroll position please use `Controller.scrollTo()`.
@@ -564,7 +566,7 @@ export default function Controller (options) {
 	 * // returns all infos as an object
 	 * var infos = controller.info();
 	 *
-	 * @param {string} [about] - If passed only this info will be returned instead of an object containing all.  
+	 * @param {string} [about] - If passed only this info will be returned instead of an object containing all.
 	 							 Valid options are:
 	 							 ** `"size"` => the current viewport size of the container
 	 							 ** `"vertical"` => true if vertical scrolling, otherwise false
@@ -619,7 +621,7 @@ export default function Controller (options) {
 	};
 
 	/**
-	 * **Get** or **Set** the current enabled state of the controller.  
+	 * **Get** or **Set** the current enabled state of the controller.
 	 * This can be used to disable all Scenes connected to the controller without destroying or removing them.
 	 * @public
 	 *
@@ -642,7 +644,7 @@ export default function Controller (options) {
 		}
 		return Controller;
 	};
-	
+
 	/**
 	 * Destroy the Controller, all Scenes and everything.
 	 * @public

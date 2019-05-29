@@ -56,7 +56,4 @@ export default function ScrollMagic () {
 // TODO: temporary workaround for chrome's scroll jitter bug
 window.addEventListener("mousewheel", function () {});
 
-// global const
-var PIN_SPACER_ATTRIBUTE = "data-scrollmagic-pin-spacer";
-
 export { ScrollMagic, Controller, Scene }
