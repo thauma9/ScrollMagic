@@ -200,14 +200,14 @@
 			_indicators.updateTriggerGroupPositions();
 		};
 
-		_container.addEventListener("resize", handleTriggerPositionChange);
+		_container.addEventListener("resize", handleTriggerPositionChange, { passive: true });
 		if (!_isDocument) {
-			window.addEventListener("resize", handleTriggerPositionChange);
-			window.addEventListener("scroll", handleTriggerPositionChange);
+			window.addEventListener("resize", handleTriggerPositionChange, { passive: true });
+			window.addEventListener("scroll", handleTriggerPositionChange, { passive: true });
 		}
 		// update all related bounds containers
-		_container.addEventListener("resize", handleBoundsPositionChange);
-		_container.addEventListener("scroll", handleBoundsPositionChange);
+		_container.addEventListener("resize", handleBoundsPositionChange, { passive: true });
+		_container.addEventListener("scroll", handleBoundsPositionChange, { passive: true});
 
 
 		// updates the position of the bounds container to aligned to the right for vertical containers and to the bottom for horizontal
